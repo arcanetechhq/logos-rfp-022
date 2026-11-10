@@ -1,0 +1,18 @@
+{
+  "proving_started_utc": "2026-11-18 14:04:31 UTC",
+  "status_at_manifest_creation": "CPU proving in progress; this manifest does not assert a completed proof",
+  "files": {
+    "checkpoint-program.bin": {
+      "bytes": 955288,
+      "sha256": "e118d57e4df1c7d25eb03d9f7655a1b747e2c778cb92aaf35fc97a5d12d32011"
+    },
+    "checkpoint-generation-input.borsh": {
+      "bytes": 1229647,
+      "sha256": "5bf9ebb09427046e90cbb69186d10e79596e89dc9a749ee23445542d5189eb8a"
+    },
+    "checkpoint-generation-journal.borsh": {
+      "bytes": 144,
+      "sha256": "863afaa92fe0ebe0668f32ea03e20af3147abcf31ed504caca2820feb17888cd"
+    }
+  }
+}

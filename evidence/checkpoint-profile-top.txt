@@ -1,0 +1,26 @@
+File: unknown
+Type: cycles
+Showing nodes accounting for 221137075, 99.38% of 222521739 total
+Dropped 164 nodes (cum <= 1112608)
+Showing top 20 nodes out of 35
+      flat  flat%   sum%        cum   cum%
+ 127883392 57.47% 57.47%  128761161 57.86%  sys_read_words
+  27052256 12.16% 69.63%  156066044 70.14%  <risc0_zkvm::guest::env::read::FdReader as risc0_zkvm::serde::deserializer::WordRead>::read_words
+  25822653 11.60% 81.23%  184812258 83.05%  <serde_core::de::impls::<impl serde_core::de::Deserialize for alloc::vec::Vec<T>>::deserialize::VecVisitor<T> as serde_core::de::Visitor>::visit_seq
+  12350794  5.55% 86.78%   22731600 10.22%  memcpy
+  10131194  4.55% 91.34%   10131194  4.55%  [PageIn]
+   7042692  3.16% 94.50%    7724915  3.47%  memcmp
+   4384527  1.97% 96.47%    4384527  1.97%  [PageOut]
+   3727787  1.68% 98.15%    3765019  1.69%  k256::arithmetic::field::field_10x26::FieldElement10x26::mul
+   2442780  1.10% 99.24%    3187478  1.43%  sys_sha_buffer
+    188800 0.085% 99.33%    2988937  1.34%  k256::arithmetic::projective::ProjectivePoint::add
+     58496 0.026% 99.35%    1428204  0.64%  k256::arithmetic::projective::ProjectivePoint::double
+     11269 0.0051% 99.36%    4781809  2.15%  borsh::de::BorshDeserialize::deserialize
+      9616 0.0043% 99.36%    2461297  1.11%  <lee_core::account::Account as borsh::de::BorshDeserialize>::deserialize_reader
+      7870 0.0035% 99.37%    5266409  2.37%  k256::arithmetic::mul::lincomb
+      6764 0.003% 99.37%    9925981  4.46%  <lee_core::account::Account as borsh::ser::BorshSerialize>::serialize
+      6721 0.003% 99.37%    7355408  3.31%  __rustc[36d1281096e5c6f0]
+      3019 0.0014% 99.37%   35443048 15.93%  acceptance_core::apply
+      2832 0.0013% 99.38%   10329235  4.64%  <acceptance_core::State as borsh::ser::BorshSerialize>::serialize
+      2310 0.001% 99.38%    2416317  1.09%  <lee_core::account::actor_state::ActorState as borsh::de::BorshDeserialize>::deserialize_reader
+      1303 0.00059% 99.38%    3216717  1.45%  <risc0_zkp::core::hash::sha::guest::Impl as risc0_zkp::core::hash::sha::Sha256>::hash_bytes

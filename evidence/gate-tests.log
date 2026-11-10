@@ -1,0 +1,15 @@
+warning: lee@0.1.0: Generated module at ./target/debug/build/lee-c0af5c312efd148b/out/lee/privacy_preserving_circuit/mod.rs
+warning: programs@0.1.0: Generated module at ./target/debug/build/programs-ddc87d55285d45e6/out/lez/programs/mod.rs
+   Compiling checkpoint-methods v0.1.0 (./checkpoint-methods)
+   Compiling reverse-methods v0.1.0 (./methods)
+   Compiling reverse-settlement-prototype v0.1.0 (.)
+    Finished `test` profile [unoptimized] target(s) in 20.05s
+warning: the following packages contain code that will be rejected by a future version of Rust: block v0.1.6
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 2`
+     Running unittests src/bin/checkpoint.rs (outputs/reverse-settlement/target/debug/deps/checkpoint-f95e28de8de7167f)
+
+running 1 test
+test release_gate::tests::rejects_fake_receipt_before_any_anchor_processing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

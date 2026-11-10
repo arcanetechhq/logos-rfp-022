@@ -1,0 +1,14 @@
+PASS synthetic genesis executed native fee+clock; full_state_digest=90e3d67cfa64b1a8d96aeb0307e6a872530606437cb1ab5b7213c9968c83588d
+PASS reverified cached real native PPE shield (preserved signed transaction)
+PASS private funding accepted by native apply_block and membership witness obtained
+PASS reverified cached real native PPE burn (preserved signed transaction)
+PASS restricted acceptance reference matches native validator + apply_state_diff byte-for-byte over full V03State
+PASS burn accepted by native apply_block; exit commitment present; emitted_event_groups=1
+PASS reverified cached real native PPE conflicting-burn (preserved signed transaction)
+PASS conflicting genuine proof rejected by native apply_block after fresh payer signature, atomically: Transaction 0 failed fee classification: fee action failed: Invalid input: Nullifier already seen
+PASS real native PPE stale-public-simulation: proof_bytes=223047 elapsed_ms=833473
+PASS forged success receipt with self-consistent block hash rejected atomically: Transaction 0 is listed with receipt Some(TransactionReceipt { success: true, fee: FeeReceipt { gas_exec: 10000000, gas_stor: 224997, fee_base: 81799976, tip: 0, refund: 0 } }), but settled to Some(TransactionReceipt { success: false, fee: FeeReceipt { gas_exec: 10000000, gas_stor: 224997, fee_base: 81799976, tip: 0, refund: 0 } })
+PASS valid execution proof + reverted settlement creates no additional exit
+PASS receipts are hash-bound; BedrockStatus::Finalized is unbound and supplies no finality proof
+{"accepted_exit_count":1,"cryptographic_ppe_proofs":true,"elapsed_ms":849187,"exit_root":"439b0f3c2bd3d0d83a0486df9e20911c175120f69be640f36de93743f748e261","initial_full_state_digest":"8a2f9e0eac01aa3fd36524ee6c2c8d5f37a4b442d84e49d07a768f874bb07aed","native_block_settlement":true,"native_ppe_image_id":"c852565ff088eb45c54c7474bff698d2abca8ce86b4b5031fef5ee760449926c","post_full_state_digest":"16e2d4eadf3e0fc4d02b5b5ce0120e44a47a40639a09b005adb59d33707ab346","release":false,"source_finality_verified":false,"synthetic_genesis":true}
+PASS release gate CLOSED: source history authentication/finality proof unavailable

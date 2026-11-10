@@ -1,0 +1,6 @@
+PASS synthetic genesis executed native fee+clock; full_state_digest=90e3d67cfa64b1a8d96aeb0307e6a872530606437cb1ab5b7213c9968c83588d
+PASS real native PPE shield: proof_bytes=223047 elapsed_ms=354160
+PASS private funding accepted by native apply_block and membership witness obtained
+PASS real native PPE burn: proof_bytes=223047 elapsed_ms=457415
+PASS real native PPE conflicting-burn: proof_bytes=223047 elapsed_ms=887824
+PASS burn accepted by native apply_block; exit commitment present; emitted_event_groups=1

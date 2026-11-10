@@ -1,0 +1,20 @@
+{
+  "verified_date":"2026-11-18",
+  "rfp":"920fad928a4592f0fdf4356046a06973fb5c931d",
+  "lez":"14cb5d092e70c3d1fc014d4921d0b13bea197b5d",
+  "sdk":"1b5073a10caaa63cbbd825bd4397f2f1fb48b33a",
+  "blockchain":"a159f8c155df68d7e2f045a418ae737de246354e",
+  "compared_blockchain_head":"339075907943626ef585ba370dca8009909a99a9",
+  "specs":"8784398f0fc9402ab1daac187dcb897881d427f7",
+  "risc0-zkvm":"3.1.0",
+  "r0vm":"3.1.0",
+  "risc0-circuit-rv32im":"4.1.0",
+  "risc0-circuit-recursion":"4.1.0",
+  "risc0-zkp":"3.0.6",
+  "risc0-groth16":"3.0.6",
+  "risc0-build":"3.0.7",
+  "guest_rust":"1.91.1",
+  "host_rust":"1.98.1",
+  "macos_release_archive_sha256":"3b50b0393b8e4158e7129add4cfe0cbc536e994b5abc6a3a435e1e6b841c0990",
+  "linux_release_archive_sha256":"415ca205d4408f5d768b9e4d623f2aac6b869329a6cf965f0c57a88a6dbb5871"
+}

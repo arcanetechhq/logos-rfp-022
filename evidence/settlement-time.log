@@ -1,0 +1,30 @@
+
+thread 'main' (1) panicked at ./burn-core/src/lib.rs:50:13:
+experimental one-exit capacity forces stale settlement revert
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (1) panicked at ./burn-core/src/lib.rs:50:13:
+experimental one-exit capacity forces stale settlement revert
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (1) panicked at ./burn-core/src/lib.rs:50:13:
+experimental one-exit capacity forces stale settlement revert
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+      849.82 real      1945.99 user        67.05 sys
+          4138827776  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             4881919  page reclaims
+                 473  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                 226  messages sent
+                 587  messages received
+                  56  signals received
+              168429  voluntary context switches
+             8136205  involuntary context switches
+         69411949057  instructions retired
+         22177278204  cycles elapsed
+            11699264  peak memory footprint

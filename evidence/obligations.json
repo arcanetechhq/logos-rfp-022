@@ -1,0 +1,16 @@
+{
+  "data_origin": "synthetic local genesis and channel configuration; not a live source-chain history",
+  "native_ppe_receipts": "four real Succinct receipts on RISC Zero 3.1.0; Fake forbidden",
+  "native_lez_full_block_settlement": "executed successfully including negative cases; not inside the checkpoint proof",
+  "restricted_action_reference": "full V03State bytes match native validator plus apply_state_diff",
+  "checkpoint_guest": "positive execution and native differential passed; real outer proof is still running, no completed receipt yet",
+  "native_inscription_authentication": "real Ed25519/parent/accreditation/slot checks and body_root on synthetic context",
+  "authenticated_source_header": false,
+  "source_ledger_replay_proven": false,
+  "source_canonicality_finality_proven": false,
+  "production_genesis_initialization_proven": false,
+  "full_lez_block_settlement_proven": false,
+  "private_user_membership_destination_nullifier_proof": false,
+  "ethereum_verification_executed": false,
+  "release_enabled": false
+}

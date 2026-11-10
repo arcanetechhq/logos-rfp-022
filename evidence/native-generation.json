@@ -1,0 +1,13 @@
+{
+  "accepted_exit_count": 1,
+  "cryptographic_ppe_proofs": true,
+  "elapsed_ms": 849187,
+  "exit_root": "439b0f3c2bd3d0d83a0486df9e20911c175120f69be640f36de93743f748e261",
+  "initial_full_state_digest": "8a2f9e0eac01aa3fd36524ee6c2c8d5f37a4b442d84e49d07a768f874bb07aed",
+  "native_block_settlement": true,
+  "native_ppe_image_id": "c852565ff088eb45c54c7474bff698d2abca8ce86b4b5031fef5ee760449926c",
+  "post_full_state_digest": "16e2d4eadf3e0fc4d02b5b5ce0120e44a47a40639a09b005adb59d33707ab346",
+  "release": false,
+  "source_finality_verified": false,
+  "synthetic_genesis": true
+}

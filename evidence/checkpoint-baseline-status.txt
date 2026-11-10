@@ -1,0 +1,4 @@
+The initial proving attempt used serde Vec<u8> input and executed successfully (208,006,046 user cycles, 219 segments).
+It was explicitly stopped before obtaining a receipt after profiling identified input syscalls as the dominant cost.
+It is NOT cryptographic proof evidence. The final native-framed guest executes 26,574,665 user cycles, 38 segments.
+The native crypto-bigint patch alone left the measured cycle count unchanged; the reduction came from LEZ framing.

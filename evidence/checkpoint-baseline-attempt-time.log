@@ -1,0 +1,25 @@
+
+thread 'main' (64678953) panicked at src/bin/checkpoint.rs:19:83:
+called `Result::unwrap()` on an `Err` value: rx len failed
+
+Caused by:
+    failed to fill whole buffer
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+     1574.46 real      3929.97 user       147.52 sys
+          5556633600  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+            10949045  page reclaims
+                 516  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                1205  messages sent
+                2427  messages received
+                   2  signals received
+              441378  voluntary context switches
+            17246483  involuntary context switches
+          3916416790  instructions retired
+          1478234330  cycles elapsed
+            16302912  peak memory footprint

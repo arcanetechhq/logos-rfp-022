@@ -1,0 +1,6 @@
+PASS synthetic genesis executed native fee+clock; full_state_digest=90e3d67cfa64b1a8d96aeb0307e6a872530606437cb1ab5b7213c9968c83588d
+PASS reverified cached real native PPE shield
+PASS private funding accepted by native apply_block and membership witness obtained
+PASS reverified cached real native PPE burn
+PASS restricted acceptance reference matches native validator + apply_state_diff byte-for-byte over full V03State
+PASS burn accepted by native apply_block; exit commitment present; emitted_event_groups=1

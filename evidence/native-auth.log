@@ -1,0 +1,5 @@
+PASS native inscription signature + accredited signer + parent + channel state update
+PASS payload mutation changes native message id, tx signing hash and body_root; old signature rejected
+PASS valid signature with wrong parent or unaccredited key rejected
+PASS native slot rotation rejects an accredited key outside its turn and accepts the scheduled key
+{"body_root":"4f6330cb826afae1e28a65dd733ed292c18690f479efddf9d897301ef3067b3f","channel_initialized_from":"synthetic local inscription","elapsed_ms":232,"finality_verified":false,"fixture":true,"ledger_validated":false,"msg_id":"a7fa9f4f63769245ebf2ee7a0b7936bbec050c8cc1e295ee12f3b8aec47947a5","pol_verified":false,"release":false,"tx_hash":"c76ec64960ba29133a8c40c3134b4a91dd5f4093aca12b1d3f79cf3f23dd041d"}

@@ -1,0 +1,24 @@
+
+thread 'main' (64562305) panicked at src/main.rs:101:33:
+assertion `left == right` failed
+  left: [64, 141, 214, 255, 42, 233, 155, 79, 116, 198, 211, 42, 195, 36, 170, 128, 108, 93, 35, 103, 135, 54, 201, 145, 246, 34, 102, 216, 15, 15, 128, 239]
+ right: [0, 178, 41, 74, 136, 48, 30, 85, 117, 215, 24, 248, 11, 200, 217, 213, 59, 0, 42, 188, 246, 78, 156, 203, 120, 9, 148, 191, 110, 120, 90, 208]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+     1705.68 real      5781.88 user       161.44 sys
+          4437409792  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+            11751306  page reclaims
+                2215  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                 220  messages sent
+                 575  messages received
+                   0  signals received
+              228431  voluntary context switches
+            21208700  involuntary context switches
+         63117801498  instructions retired
+         19995453217  cycles elapsed
+             8275008  peak memory footprint

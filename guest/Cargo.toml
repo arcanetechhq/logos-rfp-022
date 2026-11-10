@@ -1,0 +1,10 @@
+[package]
+name = "reverse-guests"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+[dependencies]
+burn-core = { path = "../burn-core" }
+lee_core = { path = "../../../work/upstream/lez/lee/state_machine/core" }
+risc0-zkvm = { version = "=3.1.0", default-features = false, features = ["std"] }
+[workspace]

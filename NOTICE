@@ -1,0 +1,6 @@
+Experimental source code: MIT OR Apache-2.0, no deployment or production security claim.
+The files acceptance-core/src/native/merkle_tree/{mod.rs,default_values.rs} and
+acceptance-core/src/encoding/persistent.rs are verbatim source projections from
+logos-blockchain/logos-execution-zone commit 14cb5d092e70c3d1fc014d4921d0b13bea197b5d,
+carrying the upstream MIT copyright notice retained in LICENSE-UPSTREAM-LEZ (the workspace manifests declare MIT OR Apache-2.0). reproduce.sh verifies their bytes.
+Other native modules are compiled directly from pinned source checkouts.

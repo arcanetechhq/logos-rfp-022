@@ -1,0 +1,9 @@
+[package]
+name = "burn-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+[dependencies]
+lee_core = { path = "../../../work/upstream/lez/lee/state_machine/core" }
+borsh = { version = "1.5.7", features = ["derive"] }
+sha2 = "0.10"

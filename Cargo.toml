@@ -1,0 +1,48 @@
+[package]
+name = "reverse-settlement-prototype"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+acceptance-core = { path = "acceptance-core", features = ["host"] }
+reverse-methods = { path = "methods" }
+system_accounts = { path = "../../work/upstream/lez/lez/system_accounts" }
+clock_core = { path = "../../work/upstream/lez/lez/programs/clock/core" }
+burn-core = { path = "burn-core" }
+risc0-binfmt = "=3.0.6"
+chain_state = { path = "../../work/upstream/lez/lez/chain_state" }
+common = { path = "../../work/upstream/lez/lez/common" }
+programs = { path = "../../work/upstream/lez/lez/programs", features = ["artifacts"] }
+fee_core = { path = "../../work/upstream/lez/lez/programs/fee/core" }
+lee = { path = "../../work/upstream/lez/lee/state_machine" }
+lee_core = { path = "../../work/upstream/lez/lee/state_machine/core", features = ["host"] }
+borsh = { version = "1.5.7", features = ["derive"] }
+sha2 = "0.10"
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+risc0-zkvm = { version = "=3.1.0", default-features = false, features = ["std", "client"] }
+
+[profile.dev]
+debug = 0
+[profile.test]
+debug = 0
+
+[features]
+checkpoint = ["dep:checkpoint-methods"]
+
+[dependencies.checkpoint-methods]
+path = "checkpoint-methods"
+optional = true
+
+[[bin]]
+name = "checkpoint"
+path = "src/bin/checkpoint.rs"
+required-features = ["checkpoint"]
+
+[[bin]]
+name = "checkpoint_cycles"
+path = "src/bin/checkpoint_cycles.rs"
+required-features = ["checkpoint"]

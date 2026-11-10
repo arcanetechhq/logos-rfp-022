@@ -1,0 +1,18 @@
+[package]
+name = "checkpoint-guest"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+[dependencies]
+acceptance-core = { path = "../acceptance-core" }
+lee_core = { path = "../../../work/upstream/lez/lee/state_machine/core" }
+borsh = "1.5.7"
+risc0-zkvm = { version = "=3.1.0", default-features = false, features = ["std"] }
+[workspace]
+
+[package.metadata.risc0]
+rustc-flags = ["-A", "deprecated"]
+
+# Reuse the exact native LEZ accelerator pin; no new circuit is implemented.
+[patch.crates-io]
+crypto-bigint = { git = "https://github.com/risc0/RustCrypto-crypto-bigint", rev = "3ab63a6f1048833f7047d5a50532e4a4cc789384" }

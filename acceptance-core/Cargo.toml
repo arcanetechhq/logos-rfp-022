@@ -1,0 +1,16 @@
+[package]
+name = "acceptance-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+[dependencies]
+burn-core = { path = "../burn-core" }
+lee_core = { path = "../../../work/upstream/lez/lee/state_machine/core" }
+program_loader_core = { path = "../../../work/upstream/lez/lee/program_loader" }
+borsh = { version = "1.5.7", features = ["derive", "de_strict_order"] }
+rpds = "1.2.1"
+sha2 = "0.10"
+k256 = { version = "0.13.3", features = ["schnorr"] }
+risc0-zkvm = { version = "=3.1.0", default-features = false, features = ["std"] }
+[features]
+host = ["lee_core/host"]

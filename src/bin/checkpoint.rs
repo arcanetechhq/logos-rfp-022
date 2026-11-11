@@ -164,7 +164,8 @@ fn main() {
         Err(release_gate::Rejection::InvalidActionProof)
     );
     println!("PASS RELEASE DENIED: no authenticated canonical Logos history/finality anchor");
-    let out = serde_json::json!({"cached_receipt":cached,"checkpoint_image_id":hex::encode(risc0_zkvm::sha::Digest::from(checkpoint_methods::CHECKPOINT_GUEST_ID)),"cycles":total_cycles,"receipt_bytes":seal_bytes.len(),"prove_ms":prove_ms,"verify_ms":verify_ms,"before":hex::encode(journal.before),"after":hex::encode(journal.after),"exit_root":hex::encode(journal.exit_root),"native_action_differential":true,"host_l2_transaction_binding_checked":true,"full_block_proven":false,"source_finality_proven":false,"ethereum_verification_run":false,"release":false});
+    let receipt_kind = match &receipt.inner { InnerReceipt::Composite(_) => "Composite", InnerReceipt::Succinct(_) => "Succinct", InnerReceipt::Groth16(_) => "Groth16", _ => "Other" };
+    let out = serde_json::json!({"receipt_kind":receipt_kind,"cached_receipt":cached,"checkpoint_image_id":hex::encode(risc0_zkvm::sha::Digest::from(checkpoint_methods::CHECKPOINT_GUEST_ID)),"cycles":total_cycles,"receipt_bytes":seal_bytes.len(),"prove_ms":prove_ms,"verify_ms":verify_ms,"before":hex::encode(journal.before),"after":hex::encode(journal.after),"exit_root":hex::encode(journal.exit_root),"native_action_differential":true,"host_l2_transaction_binding_checked":true,"full_block_proven":false,"source_finality_proven":false,"ethereum_verification_run":false,"release":false});
     std::fs::write(
         if cached {
             "evidence/checkpoint-verification.json"

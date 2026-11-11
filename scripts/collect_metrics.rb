@@ -25,10 +25,11 @@ result = {
   'ppe' => proofs,
   'baseline_execution_only' => preflight.call('checkpoint-baseline-preflight.log'),
   'native_framing_execution_only' => preflight.call('checkpoint-framed-preflight.log'),
+  'interrupted_checkpoint_attempt' => JSON.parse(File.read(File.join(evidence, 'checkpoint-interrupted-status.json'))),
   'baseline_proving_status' => 'Stopped after profiling, no receipt obtained; not positive proof evidence',
   'checkpoint_proof' => JSON.parse(File.read(File.join(evidence, 'checkpoint.json'))),
   'native_authentication' => JSON.parse(File.read(File.join(evidence, 'native-auth.json'))),
-  'max_r0vm_rss_bytes' => { 'fourth_ppe_generation' => rss.call('corrected-prover-resources'), 'checkpoint_generation' => rss.call('checkpoint-framed-prover-resources') },
+  'max_r0vm_rss_bytes' => { 'fourth_ppe_generation' => rss.call('corrected-prover-resources'), 'checkpoint_generation' => rss.call('checkpoint-retry-prover-resources') },
   'full_source_history_cost_measured' => false,
   'ethereum_gas_measured' => false
 }

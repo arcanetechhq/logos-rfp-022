@@ -1,0 +1,7 @@
+{
+  "status": "interrupted_by_desktop_restart",
+  "receipt_obtained": false,
+  "last_observed_elapsed_seconds": 5380,
+  "last_observed_cpu_seconds": 28697.67,
+  "note": "Last observed live process before app update; duration is a lower bound, not completed proving time. No cryptographic failure was observed. Resource logs did not finalize."
+}

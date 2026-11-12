@@ -1,0 +1,12 @@
+{
+  "host_load": "concurrent workloads; not isolated",
+  "retry_started_utc": "2026-11-18T15:45:46Z",
+  "scheduling_change": {
+    "elapsed_seconds_approx": 3600,
+    "target": "only this prototype r0vm process, PID 21592",
+    "command": "/usr/sbin/taskpolicy -B -p 21592",
+    "exit_code": 0,
+    "effect": "not established; no speedup claimed"
+  },
+  "benchmark_comparability": "End-to-end observation only; mixed scheduling conditions"
+}

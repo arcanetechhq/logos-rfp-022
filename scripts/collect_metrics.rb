@@ -25,6 +25,7 @@ result = {
   'ppe' => proofs,
   'baseline_execution_only' => preflight.call('checkpoint-baseline-preflight.log'),
   'native_framing_execution_only' => preflight.call('checkpoint-framed-preflight.log'),
+  'checkpoint_runtime_conditions' => JSON.parse(File.read(File.join(evidence, 'checkpoint-runtime-conditions.json'))),
   'interrupted_checkpoint_attempt' => JSON.parse(File.read(File.join(evidence, 'checkpoint-interrupted-status.json'))),
   'baseline_proving_status' => 'Stopped after profiling, no receipt obtained; not positive proof evidence',
   'checkpoint_proof' => JSON.parse(File.read(File.join(evidence, 'checkpoint.json'))),

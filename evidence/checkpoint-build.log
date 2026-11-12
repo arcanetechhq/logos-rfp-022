@@ -1,0 +1,8 @@
+warning: lee@0.1.0: Generated module at ./target/debug/build/lee-c0af5c312efd148b/out/lee/privacy_preserving_circuit/mod.rs
+warning: programs@0.1.0: Generated module at ./target/debug/build/programs-ddc87d55285d45e6/out/lez/programs/mod.rs
+   Compiling reverse-methods v0.1.0 (./methods)
+   Compiling checkpoint-methods v0.1.0 (./checkpoint-methods)
+   Compiling reverse-settlement-prototype v0.1.0 (.)
+    Finished `dev` profile [unoptimized] target(s) in 6.48s
+warning: the following packages contain code that will be rejected by a future version of Rust: block v0.1.6
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 2`

@@ -1,0 +1,26 @@
+
+thread 'main' (1) panicked at ./acceptance-core/src/lib.rs:89:31:
+nullifier already seen
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' (1) panicked at ./acceptance-core/src/lib.rs:89:94:
+unrecognized root
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+    10175.63 real     34435.59 user       716.32 sys
+          9950609408  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+            44084902  page reclaims
+                1434  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                1022  messages sent
+                2191  messages received
+                   6  signals received
+               49468  voluntary context switches
+           135943721  involuntary context switches
+        865566405985  instructions retired
+        267706675070  cycles elapsed
+            83576384  peak memory footprint

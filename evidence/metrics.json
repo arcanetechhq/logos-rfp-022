@@ -1,0 +1,113 @@
+{
+  "date": "2026-11-18",
+  "host": {
+    "cpu": "Apple M1 Pro",
+    "logical_cpus": 10,
+    "ram_bytes": 34359738368,
+    "host_profile": "Rust dev, debug=0; official release r0vm 3.1.0"
+  },
+  "conditions": "Concurrent CPU load; not an isolated throughput benchmark. PPE generation occurred in two runs; corrected suite reverified the first three real receipts. Initial harness scratch-state assertion failure is preserved.",
+  "ppe": {
+    "shield": {
+      "proof_bytes": 223047,
+      "stage_wall_ms": 354160
+    },
+    "burn": {
+      "proof_bytes": 223047,
+      "stage_wall_ms": 457415
+    },
+    "conflicting-burn": {
+      "proof_bytes": 223047,
+      "stage_wall_ms": 887824
+    },
+    "stale-public-simulation": {
+      "proof_bytes": 223047,
+      "stage_wall_ms": 833473
+    }
+  },
+  "baseline_execution_only": {
+    "user_cycles": 208006046,
+    "segments": 219,
+    "execution_ms": 20509,
+    "input_bytes": 1229647
+  },
+  "native_framing_execution_only": {
+    "user_cycles": 26574665,
+    "segments": 38,
+    "execution_ms": 4046,
+    "input_bytes": 1229647
+  },
+  "checkpoint_runtime_conditions": {
+    "host_load": "concurrent workloads; not isolated",
+    "retry_started_utc": "2026-11-18T15:45:46Z",
+    "scheduling_change": {
+      "elapsed_seconds_approx": 3600,
+      "target": "only this prototype r0vm process, PID 21592",
+      "command": "/usr/sbin/taskpolicy -B -p 21592",
+      "exit_code": 0,
+      "effect": "not established; no speedup claimed"
+    },
+    "benchmark_comparability": "End-to-end observation only; mixed scheduling conditions"
+  },
+  "interrupted_checkpoint_attempt": {
+    "status": "interrupted_by_desktop_restart",
+    "receipt_obtained": false,
+    "last_observed_elapsed_seconds": 5380,
+    "last_observed_cpu_seconds": 28697.67,
+    "note": "Last observed live process before app update; duration is a lower bound, not completed proving time. No cryptographic failure was observed. Resource logs did not finalize."
+  },
+  "baseline_proving_status": "Stopped after profiling, no receipt obtained; not positive proof evidence",
+  "checkpoint_proof": {
+    "after": "d2f84593486b310034f85a090c104dbcfb7007e1bef50637849c9f68caf62df0",
+    "before": "4ebd2e880cd2d0c057eb833380306de5c764c44b0f34149720448b110676755e",
+    "cached_receipt": false,
+    "checkpoint_image_id": "eab8b35ddaa3831f61fb3c545ec7419478cc5032754a65552cddb8f64e0fb1c7",
+    "cycles": 39845888,
+    "ethereum_verification_run": false,
+    "exit_root": "439b0f3c2bd3d0d83a0486df9e20911c175120f69be640f36de93743f748e261",
+    "full_block_proven": false,
+    "host_l2_transaction_binding_checked": true,
+    "native_action_differential": true,
+    "prove_ms": 10095564,
+    "receipt_bytes": 10914525,
+    "release": false,
+    "source_finality_proven": false,
+    "verify_ms": 14954
+  },
+  "checkpoint_reverification": {
+    "after": "d2f84593486b310034f85a090c104dbcfb7007e1bef50637849c9f68caf62df0",
+    "before": "4ebd2e880cd2d0c057eb833380306de5c764c44b0f34149720448b110676755e",
+    "cached_receipt": true,
+    "checkpoint_image_id": "eab8b35ddaa3831f61fb3c545ec7419478cc5032754a65552cddb8f64e0fb1c7",
+    "cycles": null,
+    "ethereum_verification_run": false,
+    "exit_root": "439b0f3c2bd3d0d83a0486df9e20911c175120f69be640f36de93743f748e261",
+    "full_block_proven": false,
+    "host_l2_transaction_binding_checked": true,
+    "native_action_differential": true,
+    "prove_ms": null,
+    "receipt_bytes": 10914525,
+    "receipt_kind": "Composite",
+    "release": false,
+    "source_finality_proven": false,
+    "verify_ms": 15720
+  },
+  "native_authentication": {
+    "body_root": "4f6330cb826afae1e28a65dd733ed292c18690f479efddf9d897301ef3067b3f",
+    "channel_initialized_from": "synthetic local inscription",
+    "elapsed_ms": 171,
+    "finality_verified": false,
+    "fixture": true,
+    "ledger_validated": false,
+    "msg_id": "a7fa9f4f63769245ebf2ee7a0b7936bbec050c8cc1e295ee12f3b8aec47947a5",
+    "pol_verified": false,
+    "release": false,
+    "tx_hash": "c76ec64960ba29133a8c40c3134b4a91dd5f4093aca12b1d3f79cf3f23dd041d"
+  },
+  "max_r0vm_rss_bytes": {
+    "fourth_ppe_generation": 4138827776,
+    "checkpoint_generation": 9950609408
+  },
+  "full_source_history_cost_measured": false,
+  "ethereum_gas_measured": false
+}

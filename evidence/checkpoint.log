@@ -1,0 +1,10 @@
+Reverifying cached cryptographic checkpoint receipt; no new proving measurement
+PASS host binding: verified checkpoint action is the exact transaction in the accepted native block/inscription payload
+PASS real checkpoint receipt: cycles=None receipt_bytes=10914525 prove_ms=None verify_ms=15720
+PASS checkpoint before/after commitments and tx hash match independently executed native LEZ action
+PASS modified journal and wrong image ID rejected
+PASS fixture checkpoint head rejects predecessor substitution and replay after advancing
+PASS genuine PPE proof with spent nullifier aborts checkpoint guest
+PASS genuine PPE proof with unknown commitment root aborts checkpoint guest
+PASS RELEASE DENIED: no authenticated canonical Logos history/finality anchor
+{"after":"d2f84593486b310034f85a090c104dbcfb7007e1bef50637849c9f68caf62df0","before":"4ebd2e880cd2d0c057eb833380306de5c764c44b0f34149720448b110676755e","cached_receipt":true,"checkpoint_image_id":"eab8b35ddaa3831f61fb3c545ec7419478cc5032754a65552cddb8f64e0fb1c7","cycles":null,"ethereum_verification_run":false,"exit_root":"439b0f3c2bd3d0d83a0486df9e20911c175120f69be640f36de93743f748e261","full_block_proven":false,"host_l2_transaction_binding_checked":true,"native_action_differential":true,"prove_ms":null,"receipt_bytes":10914525,"receipt_kind":"Composite","release":false,"source_finality_proven":false,"verify_ms":15720}

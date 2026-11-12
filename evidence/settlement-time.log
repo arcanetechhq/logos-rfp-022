@@ -10,21 +10,21 @@ note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 thread 'main' (1) panicked at ./burn-core/src/lib.rs:50:13:
 experimental one-exit capacity forces stale settlement revert
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-      849.82 real      1945.99 user        67.05 sys
-          4138827776  maximum resident set size
+        9.41 real         6.90 user         0.41 sys
+            49184768  maximum resident set size
                    0  average shared memory size
                    0  average unshared data size
                    0  average unshared stack size
-             4881919  page reclaims
-                 473  page faults
+               67015  page reclaims
+                 242  page faults
                    0  swaps
                    0  block input operations
                    0  block output operations
-                 226  messages sent
-                 587  messages received
-                  56  signals received
-              168429  voluntary context switches
-             8136205  involuntary context switches
-         69411949057  instructions retired
-         22177278204  cycles elapsed
-            11699264  peak memory footprint
+                 198  messages sent
+                 480  messages received
+                  48  signals received
+                 450  voluntary context switches
+               21589  involuntary context switches
+         63211825259  instructions retired
+         19380254175  cycles elapsed
+            24446592  peak memory footprint

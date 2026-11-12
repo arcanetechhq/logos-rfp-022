@@ -1,7 +1,7 @@
 {
   "body_root": "4f6330cb826afae1e28a65dd733ed292c18690f479efddf9d897301ef3067b3f",
   "channel_initialized_from": "synthetic local inscription",
-  "elapsed_ms": 232,
+  "elapsed_ms": 171,
   "finality_verified": false,
   "fixture": true,
   "ledger_validated": false,

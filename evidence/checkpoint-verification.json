@@ -1,0 +1,18 @@
+{
+  "after": "d2f84593486b310034f85a090c104dbcfb7007e1bef50637849c9f68caf62df0",
+  "before": "4ebd2e880cd2d0c057eb833380306de5c764c44b0f34149720448b110676755e",
+  "cached_receipt": true,
+  "checkpoint_image_id": "eab8b35ddaa3831f61fb3c545ec7419478cc5032754a65552cddb8f64e0fb1c7",
+  "cycles": null,
+  "ethereum_verification_run": false,
+  "exit_root": "439b0f3c2bd3d0d83a0486df9e20911c175120f69be640f36de93743f748e261",
+  "full_block_proven": false,
+  "host_l2_transaction_binding_checked": true,
+  "native_action_differential": true,
+  "prove_ms": null,
+  "receipt_bytes": 10914525,
+  "receipt_kind": "Composite",
+  "release": false,
+  "source_finality_proven": false,
+  "verify_ms": 15720
+}

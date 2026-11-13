@@ -3,7 +3,7 @@
   "native_ppe_receipts": "four real Succinct receipts on RISC Zero 3.1.0; Fake forbidden",
   "native_lez_full_block_settlement": "executed successfully including negative cases; not inside the checkpoint proof",
   "restricted_action_reference": "full V03State bytes match native validator plus apply_state_diff",
-  "checkpoint_guest": "positive execution and native differential passed; real outer proof is still running, no completed receipt yet",
+  "checkpoint_guest": "real cryptographic receipt obtained and verified; all current host/guest negative cases and cached native regression suite passed; restricted action only",
   "native_inscription_authentication": "real Ed25519/parent/accreditation/slot checks and body_root on synthetic context",
   "authenticated_source_header": false,
   "source_ledger_replay_proven": false,

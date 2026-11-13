@@ -1,6 +1,6 @@
 # Logos RFP-022 — исследовательский reverse-settlement prototype
 
-**Текущий результат:** исполняемый burn → native LEZ acceptance и экспериментальный checkpoint guest ограниченного перехода состояния. Четыре native PPE receipts получены; outer checkpoint proving на CPU ещё выполняется, его receipt пока не получен. Публикация того же блока аутентифицируется настоящим channel verifier Logos. **Trustless release на Ethereum не реализован:** доказательство канонической финализированной source history отсутствует, consumer закрыт.
+**Текущий результат:** исполняемый burn → native LEZ acceptance и экспериментальный checkpoint guest ограниченного перехода состояния. Четыре native PPE receipts и настоящий checkpoint receipt получены и криптографически проверены; полный повторный прогон с сохранёнными proofs прошёл. Публикация того же блока аутентифицируется настоящим channel verifier Logos. **Trustless release на Ethereum не реализован:** доказательство канонической финализированной source history отсутствует, consumer закрыт.
 
 Это отдельная локальная работа. CRM, заявка, Google Doc, чужие ветки и исходники не изменялись. Ничего не опубликовано и не задеплоено.
 
@@ -34,7 +34,7 @@
 3. Принудительный `success=true` и заново вычисленный корректный block hash не обходят native receipt comparison. Изменения scratch state не коммитятся.
 4. Receipts входят в LEZ block hash. Изменение `BedrockStatus` на `Finalized` не меняет hash и ничего не доказывает.
 5. Изменение inscription payload ломает подпись и меняет message ID/transaction hash/body root; wrong parent/key/slot отклоняются.
-6. В checkpoint runner реализованы проверки journal/image ID/predecessor, replay, spent nullifier и неизвестного root. Полный прогон этих проверок ожидает outer receipt; положительное выполнение guest и отдельный Fake-receipt test уже выполнены.
+6. В checkpoint runner реализованы проверки journal/image ID/predecessor, replay, spent nullifier и неизвестного root. Полный прогон прошёл: изменённый journal/image ID/predecessor, replay, spent nullifier, неизвестный root и Fake receipt отклоняются; release после настоящего action proof остаётся закрыт.
 
 ## Фактические измерения
 
@@ -47,9 +47,9 @@ Apple M1 Pro, 10 logical CPUs, 32 GiB RAM; host в dev profile, официаль
 | Конфликтующий burn | 887,824 | 223 047 |
 | Burn со stale public simulation | 833,473 | 223 047 |
 
-Для checkpoint вход составил 1 229 647 байт. Исполнение исходного варианта потребовало 208 006 046 user cycles; профиль отнёс около 83% к serde/input чтению. Штатный LEZ framing снизил это до **26 574 665 user cycles**, 38 segments; execution-only run занял 4,046 с. Native crypto-bigint patch сам по себе cycle count не изменил. Медленный baseline proving остановлен до получения receipt и не считается доказательством. Первая попытка framed proving прервана обновлением desktop-приложения после как минимум 5 380 с без готового receipt; это не cryptographic failure и не завершённое измерение. Повторная попытка запущена отдельным процессом с журналом сегментов.
+Для checkpoint вход составил 1 229 647 байт. Исполнение исходного варианта потребовало 208 006 046 user cycles; профиль отнёс около 83% к serde/input чтению. Штатный LEZ framing снизил это до **26 574 665 user cycles**, 38 segments; execution-only run занял 4,046 с. Native crypto-bigint patch сам по себе cycle count не изменил. Медленный baseline proving остановлен до получения receipt и не считается доказательством. Первая попытка framed proving прервана обновлением desktop-приложения после как минимум 5 380 с без готового receipt; это не cryptographic failure и не завершённое измерение. Повторная попытка завершена отдельным процессом с журналом сегментов.
 
-После завершения checkpoint proving его verification и RSS будут записаны в `evidence/checkpoint.json` и `evidence/metrics.json`; на момент этого коммита outer receipt ещё отсутствует. gas и полная source history не измерены. `initial-generation-time.log` сохраняет первую ошибку обвязки: fee reserve уже изменял scratch state, а harness ошибочно ожидал rollback от низкоуровневого `settle_transaction`. Проверка перенесена на native `apply_block` с commit-on-Ok; полный исправленный прогон прошёл. Три уже полученных настоящих receipts были повторно проверены; четвёртый proof сгенерирован после исправления.
+Настоящий checkpoint receipt: **10 914 525 байт**  39 845 888 total cycles  generation 10095.564 с  первая verification 14954 мс; peak r0vm RSS 9 950 609 408 байт. Формат — **Composite**; conversion в Succinct/Groth16 не выполнялась. Повторная verification и все отрицательные сценарии прошли; измерения — `evidence/checkpoint.json`  `evidence/checkpoint-verification.json`  `evidence/metrics.json`. gas и полная source history не измерены. `initial-generation-time.log` сохраняет первую ошибку обвязки: fee reserve уже изменял scratch state, а harness ошибочно ожидал rollback от низкоуровневого `settle_transaction`. Проверка перенесена на native `apply_block` с commit-on-Ok; полный исправленный прогон прошёл. Три уже полученных настоящих receipts были повторно проверены; четвёртый proof сгенерирован после исправления.
 
 Ожидаемые guest panics в stderr относятся к отрицательным сценариям; критерий успешного прогона — exit code 0 и PASS assertions host harness.
 

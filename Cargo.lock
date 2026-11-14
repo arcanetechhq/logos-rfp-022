@@ -5537,6 +5537,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "redemption-actor"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "lee_core",
+ "redemption-core",
+]
+
+[[package]]
+name = "redemption-burn-methods"
+version = "0.1.0"
+dependencies = [
+ "risc0-build",
+]
+
+[[package]]
 name = "redemption-core"
 version = "0.1.0"
 dependencies = [
@@ -5714,6 +5730,8 @@ dependencies = [
  "lee",
  "lee_core",
  "programs",
+ "redemption-actor",
+ "redemption-burn-methods",
  "redemption-core",
  "reverse-methods",
  "risc0-binfmt",

@@ -180,7 +180,12 @@ contract RedemptionVault is ReentrancyGuard {
             (bool success,) = recipient.call{value: amount}("");
             if (!success) revert TransferFailed();
         } else {
-            IERC20(token).safeTransfer(recipient, amount);
+            IERC20 asset = IERC20(token);
+            uint256 fromBalance = asset.balanceOf(address(this));
+            uint256 recipientBalance = asset.balanceOf(recipient);
+            asset.safeTransfer(recipient, amount);
+            if (asset.balanceOf(address(this)) != fromBalance - amount
+                || asset.balanceOf(recipient) != recipientBalance + amount) revert TransferFailed();
         }
     }
 }

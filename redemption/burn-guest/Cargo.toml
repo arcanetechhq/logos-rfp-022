@@ -1,0 +1,15 @@
+[package]
+name = "redemption-burn-guest"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+redemption-actor = { path = "../actor" }
+lee_core = { path = "../../../../work/upstream/lez/lee/state_machine/core" }
+risc0-zkvm = { version = "=3.1.0", default-features = false, features = ["std"] }
+
+[workspace]
+
+[package.metadata.risc0]
+rustc-flags = ["-A", "deprecated"]

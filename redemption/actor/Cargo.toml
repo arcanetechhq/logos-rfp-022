@@ -1,0 +1,10 @@
+[package]
+name = "redemption-actor"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+redemption-core = { path = "../core" }
+lee_core = { path = "../../../../work/upstream/lez/lee/state_machine/core" }
+borsh = { version = "1.5.7", features = ["derive"] }

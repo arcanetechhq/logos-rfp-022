@@ -1,0 +1,6 @@
+PASS synthetic genesis executed native fee+clock; full_state_digest=90e3d67cfa64b1a8d96aeb0307e6a872530606437cb1ab5b7213c9968c83588d
+PASS reverified cached real native PPE shield (preserved signed transaction)
+PASS private funding accepted by native apply_block and membership witness obtained
+Proving real native PPE redemption-native-burn; dev mode is forbidden
+PASS real native PPE redemption-native-burn: proof_bytes=223047 elapsed_ms=696082
+PASS real burn accepted by native LEZ; exit root exported from applied state

@@ -4,12 +4,16 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use redemption_core::{Hash, Pairing, Payout};
 
 pub fn note() -> (Pairing, Payout, Hash) {
+    note_for([0x42; 32])
+}
+
+pub fn note_for(bridge_program: Hash) -> (Pairing, Payout, Hash) {
     let mut evm_chain_id = [0; 32];
     evm_chain_id[30..].copy_from_slice(&31337u16.to_be_bytes());
     let pairing = Pairing {
         logos_genesis: [1; 32],
         zone: [2; 32],
-        bridge_program: [0x42; 32],
+        bridge_program,
         evm_chain_id,
         vault: [4; 20],
         token: [0; 20],

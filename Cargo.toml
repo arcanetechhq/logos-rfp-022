@@ -32,6 +32,7 @@ debug = 0
 debug = 0
 
 [features]
+bridge = ["dep:redemption-actor", "dep:redemption-burn-methods"]
 checkpoint = ["dep:checkpoint-methods"]
 
 [dependencies.checkpoint-methods]
@@ -47,3 +48,17 @@ required-features = ["checkpoint"]
 name = "checkpoint_cycles"
 path = "src/bin/checkpoint_cycles.rs"
 required-features = ["checkpoint"]
+
+
+[dependencies.redemption-actor]
+path = "redemption/actor"
+optional = true
+
+[dependencies.redemption-burn-methods]
+path = "redemption/burn-methods"
+optional = true
+
+[[bin]]
+name = "bridge-exits"
+path = "src/bin/bridge_exits.rs"
+required-features = ["bridge"]

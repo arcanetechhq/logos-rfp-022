@@ -1,5 +1,6 @@
 [workspace]
 members = ["core", "methods", "runner"]
+exclude = ["actor", "burn-methods"]
 resolver = "3"
 
 [profile.dev]

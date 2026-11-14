@@ -12,6 +12,13 @@ fn hash(bytes: &[u8]) -> Hash {
     Impl::hash_bytes(bytes).as_bytes().try_into().unwrap()
 }
 
+/// Full native state digest used by the historical checkpoint and native fixture exporter.
+pub fn state_commitment(bytes: &[u8]) -> Hash {
+    let mut encoded = b"RFP022/full-native-V03State/v1".to_vec();
+    encoded.extend_from_slice(bytes);
+    hash(&encoded)
+}
+
 fn encoded_hash(tag: &[u8], data: &impl BorshSerialize) -> Hash {
     let mut bytes = tag.to_vec();
     data.serialize(&mut bytes).expect("writing into a Vec");

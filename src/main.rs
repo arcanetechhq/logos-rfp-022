@@ -1,13 +1,10 @@
+mod lez_blocks;
 #[path = "../redemption/fixture.rs"]
 mod redemption_fixture;
 use burn_core::{Holding, Message, TOKEN, sink};
-use common::{
-    HashType,
-    block::{Block, HashableBlockData, TransactionReceipt},
-    transaction::{FeePayee, LeeTransaction, clock_invocation, fee_invocation},
-};
+use common::transaction::{LeeTransaction, clock_invocation};
 use lee::{
-    FeeDeclaration, GenesisBuilder, PrivacyPreservingTransaction, PrivateKey, PublicKey, V03State,
+    FeeDeclaration, PrivacyPreservingTransaction, PrivateKey, PublicKey, V03State,
     privacy_preserving_transaction::{
         Message as PrivateMessage, WitnessSet as PrivateWitnessSet,
         circuit::{ProgramCatalog, Proof, Simulation},
@@ -21,8 +18,8 @@ use lee_core::{
     execution_state::{PublicExecutionContext, TransactionEntry},
     program::TransactionEvent,
 };
+use lez_blocks::{accept, build_block};
 use risc0_zkvm::{InnerReceipt, Receipt};
-use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet},
@@ -30,10 +27,7 @@ use std::{
 };
 
 fn state_digest(state: &V03State) -> [u8; 32] {
-    let mut h = Sha256::new();
-    h.update(b"RFP022/full-native-V03State/v1");
-    h.update(borsh::to_vec(state).unwrap());
-    h.finalize().into()
+    redemption_core::state_commitment(&borsh::to_vec(state).unwrap())
 }
 fn signed(
     output: lee_core::PrivacyPreservingCircuitOutput,
@@ -144,50 +138,6 @@ fn prove(
     );
     tx
 }
-fn build_block(
-    state: &V03State,
-    tip: Option<&chain_state::Tip>,
-    txs: Vec<LeeTransaction>,
-) -> Block {
-    let id = tip.map_or(lee::GENESIS_BLOCK_ID, |t| t.block_id + 1);
-    let timestamp = id * 10;
-    let (summary, payout, receipts) = if tip.is_none() {
-        (
-            fee_core::BlockFeeSummary::default(),
-            0,
-            vec![TransactionReceipt::EXEMPT; txs.len()],
-        )
-    } else {
-        chain_state::apply::derive_block_summary(state, &txs, id, timestamp)
-            .expect("native settlement summary")
-    };
-    let mut all = txs;
-    all.push(LeeTransaction::Public(fee_invocation(
-        summary,
-        payout,
-        FeePayee::Present(AccountId::new([0x79; 32])),
-    )));
-    all.push(LeeTransaction::Public(clock_invocation(id, timestamp)));
-    HashableBlockData {
-        block_id: id,
-        prev_block_hash: tip.map_or(HashType([0; 32]), |t| t.hash),
-        timestamp,
-        transactions: all,
-        receipts,
-    }
-    .into_pending_block()
-}
-fn accept(
-    state: &mut V03State,
-    tip: &mut Option<chain_state::Tip>,
-    block: &Block,
-) -> Result<Vec<common::transaction::TxEvents>, chain_state::BlockIngestError> {
-    let mut scratch = state.clone();
-    let events = chain_state::apply_block(tip.as_ref(), block, &mut scratch)?;
-    *state = scratch;
-    *tip = Some(chain_state::Tip::from(block));
-    Ok(events)
-}
 fn main() {
     assert!(
         std::env::var("RISC0_DEV_MODE").map_or(true, |v| v == "0"),
@@ -214,43 +164,14 @@ fn main() {
         balance: 100,
         exits: vec![],
     };
-    let mut state = GenesisBuilder::new()
-        .with_programs_at([
-            (TOKEN, program.clone(), true),
-            (system_accounts::fee_program_id(), programs::fee(), true),
-            (programs::clock_account_id(), programs::clock(), true),
-        ])
-        .with_public_accounts([
-            (AccountId::new([0x79; 32]), Account::default()),
-            (sink().account_id, Account::default()),
-            (
-                system_accounts::clock_account_id(),
-                Account::default().with_actor_state(
-                    programs::clock_account_id(),
-                    clock_core::ClockAccountData {
-                        block_id: 0,
-                        timestamp: 0,
-                    }
-                    .to_bytes()
-                    .into(),
-                ),
-            ),
-            (system_accounts::fee_escrow_account_id(), Account::default()),
-            (system_accounts::fee_inbox_account_id(), Account::default()),
-            (
-                owner,
-                Account::funded(1_000_000_000_000)
-                    .with_actor_state(TOKEN, borsh::to_vec(&holding).unwrap().into()),
-            ),
-            (
-                system_accounts::fee_state_account_id(),
-                Account::default().with_actor_state(
-                    system_accounts::fee_program_id(),
-                    fee_core::state::FeeState::genesis().to_bytes().into(),
-                ),
-            ),
-        ])
-        .build();
+    let mut state = lez_blocks::seeded_state(
+        TOKEN,
+        program.clone(),
+        sink().account_id,
+        None,
+        owner,
+        borsh::to_vec(&holding).unwrap(),
+    );
     let initial = state_digest(&state);
     let mut tip = None;
     let genesis = build_block(&state, None, vec![]);

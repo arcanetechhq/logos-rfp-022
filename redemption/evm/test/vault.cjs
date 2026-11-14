@@ -145,6 +145,26 @@ async function main() {
     await expectRevert(() => probe.decode(ethers.concat([bytes, "0x00"])),
       probe.interface.getError("InvalidJournal").selector);
     console.log("PASS Solidity decodes exact Rust guest journal and rejects noncanonical length");
+
+    if (process.env.VERIFY_GROTH16 === "1") {
+      const prefix = "evidence/redemption-native-v2";
+      const seal = fs.readFileSync(prefix + "-evm-seal.bin");
+      const imageId = fs.readFileSync(prefix + "-image-id.bin");
+      const journal = fs.readFileSync(prefix + "-journal.borsh");
+      const digest = ethers.sha256(journal);
+      await verifier.verify.staticCall(seal, imageId, digest);
+      const sent = await signer.sendTransaction({
+        to: await verifier.getAddress(),
+        data: verifier.interface.encodeFunctionData("verify", [seal, imageId, digest]),
+        gasLimit: 3_000_000
+      });
+      const verified = await sent.wait();
+      assert.equal(verified.status, 1);
+      journal[64] ^= 1;
+      await expectRevert(() => verifier.verify.staticCall(seal, imageId, ethers.sha256(journal)));
+      await expectRevert(() => verifier.verify.staticCall(seal, ethers.ZeroHash, digest));
+      console.log("PASS local EVM verifies the real redemption proof, verification gas used=" + verified.gasUsed);
+    }
   } finally {
     await chain.disconnect();
   }

@@ -1,0 +1,9 @@
+[package]
+name = "redemption-core"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+borsh = { version = "1.5.7", features = ["derive"] }
+risc0-zkvm = { version = "=3.1.0", default-features = false, features = ["std"] }

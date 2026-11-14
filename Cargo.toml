@@ -11,6 +11,7 @@ reverse-methods = { path = "methods" }
 system_accounts = { path = "../../work/upstream/lez/lez/system_accounts" }
 clock_core = { path = "../../work/upstream/lez/lez/programs/clock/core" }
 burn-core = { path = "burn-core" }
+redemption-core = { path = "redemption/core" }
 risc0-binfmt = "=3.0.6"
 chain_state = { path = "../../work/upstream/lez/lez/chain_state" }
 common = { path = "../../work/upstream/lez/lez/common" }

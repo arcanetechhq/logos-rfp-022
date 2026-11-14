@@ -1,0 +1,2 @@
+PASS actual RISC Zero v3.1.0 EVM verifier rejects forged source checkpoint atomically
+PASS Solidity decodes exact Rust guest journal and rejects noncanonical length

@@ -5537,6 +5537,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "redemption-core"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "risc0-zkvm",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5706,6 +5714,7 @@ dependencies = [
  "lee",
  "lee_core",
  "programs",
+ "redemption-core",
  "reverse-methods",
  "risc0-binfmt",
  "risc0-zkvm",

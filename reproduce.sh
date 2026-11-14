@@ -46,6 +46,7 @@ export RUSTFLAGS='--cap-lints=allow'
 if ! "$WORK/tools/rzup" show | rg -q '1\.91\.1'; then "$WORK/tools/rzup" install rust 1.91.1; fi
 "$WORK/tools/rzup" default rust 1.91.1
 rustup toolchain install 1.98.1 --profile minimal
+if [ "${BOOTSTRAP_ONLY:-0}" = 1 ]; then exit 0; fi
 cd "$HERE"
 # The default always produces fresh cryptographic proofs. REUSE_PROOFS=1 is an explicit fast replay.
 cargo +1.98.1 build --locked --bin reverse-settlement-prototype 2>&1 | tee evidence/build.log

@@ -1,3 +1,5 @@
+#[path = "../redemption/fixture.rs"]
+mod redemption_fixture;
 use burn_core::{Holding, Message, TOKEN, sink};
 use common::{
     HashType,
@@ -326,6 +328,58 @@ fn main() {
         )
     };
     let empty_sim = Simulation::default();
+    if std::env::var_os("NATIVE_REDEMPTION_FIXTURE").is_some() {
+        let (pairing, payout, secret) = redemption_fixture::note();
+        assert_eq!(TOKEN.as_ref(), &pairing.bridge_program);
+        let binding = redemption_core::burn_binding(pairing.id(), &payout, secret).unwrap();
+        let leaf = redemption_core::burn_leaf(pairing.bridge_program, payout.amount, binding);
+        assert_eq!(leaf, burn_core::leaf(payout.amount, binding));
+        let tx = prove(
+            "redemption-native-burn",
+            make_burn_input(private_account, membership, 0x19, binding, payout.amount),
+            &empty_sim,
+            &catalog,
+            &key,
+            &state,
+        );
+        let block = build_block(
+            &state,
+            tip.as_ref(),
+            vec![LeeTransaction::PrivacyPreserving(tx)],
+        );
+        accept(&mut state, &mut tip, &block).unwrap();
+        assert!(block.body.receipts[0].success);
+        let exits = burn_core::read_state(
+            state
+                .get_account_by_id(sink().account_id)
+                .data
+                .actor_state(TOKEN),
+        )
+        .exits;
+        assert_eq!(exits, vec![leaf]);
+        let mut tree = redemption_core::ExitTree::default();
+        for exit in &exits {
+            tree.append(*exit).unwrap();
+        }
+        let snapshot = redemption_fixture::AppliedExitSnapshot {
+            block_hash: block.header.hash.0,
+            state_digest: state_digest(&state),
+            leaves: exits,
+            root: tree.root(),
+        };
+        std::fs::write(
+            "evidence/redemption-native-checkpoint.borsh",
+            borsh::to_vec(&snapshot).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            "evidence/redemption-native-block.borsh",
+            borsh::to_vec(&block).unwrap(),
+        )
+        .unwrap();
+        println!("PASS real burn accepted by native LEZ; exit root exported from applied state");
+        return;
+    }
     let burn = prove(
         "burn",
         make_burn_input(

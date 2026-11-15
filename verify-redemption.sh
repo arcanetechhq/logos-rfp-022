@@ -27,13 +27,14 @@ if [ ! -f "$EVM/upstream/contracts/src/groth16/ControlID.sol" ]; then
   printf '%s  %s\n' '64ca2334dd6396fea7e5073cfd4db876d2a86600bf2daddb9f7171d23e3ac25b' "$EVM/risc0-ethereum.tgz" | shasum -a 256 -c -
   tar -xzf "$EVM/risc0-ethereum.tgz" --strip-components=1 -C "$EVM/upstream"
 fi
-UWS_USE_FALLBACK=1 node redemption/evm/test/vault.cjs "$EVM" | tee evidence/redemption-evm-tests.log
 
 if [ "${VERIFY_NATIVE_V2_PROOF:-0}" = 1 ]; then
   PROOF_LOG=redemption-native-v2-generation
   if [ -n "${REUSE_REDEMPTION:-}" ]; then PROOF_LOG=redemption-native-v2-reverification; fi
   NATIVE_V2_REDEMPTION=1 ./target/debug/redemption-runner | tee "evidence/$PROOF_LOG.log"
 fi
+
+UWS_USE_FALLBACK=1 node redemption/evm/test/vault.cjs "$EVM" | tee evidence/redemption-evm-tests.log
 
 if [ "${VERIFY_NATIVE_REDEMPTION:-0}" = 1 ]; then
   cargo +1.98.1 build --locked --bin reverse-settlement-prototype

@@ -1,1 +1,2 @@
-PASS cached redemption receipt cryptographically reverified
+Generated redemption receipt: prove_ms=15187 total_cycles=131072
+PASS real redemption proof: receipt_bytes=244626

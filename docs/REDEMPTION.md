@@ -4,7 +4,7 @@ The bridge code now has an incremental native LEZ burn actor, a private ZK redem
 
 ## Check the code
 
-Run `./verify-redemption.sh` from this repository. It builds the pinned guests, checks Merkle paths and payout bindings, executes two burns through native `apply_block`, and runs the vault tests in a local EVM with the released RISC Zero v3.1.0 Groth16 verifier. The checks include an actual reverted checkpoint submission. The Solidity decoder reads the exact 188-byte journal from the Rust guest. Node.js/npm and the prerequisites of the original bootstrap script are required.
+Run `./verify-redemption.sh` from this repository. It builds the pinned guests, checks Merkle paths and payout bindings, executes two burns through native `apply_block`, and runs the vault tests in a local EVM with the released RISC Zero v3.1.0 Groth16 verifier. The checks include an actual reverted checkpoint submission. The Solidity decoder reads the exact 188-byte journal from the Rust guest. Node.js/npm and the prerequisites of the original bootstrap script are required. Each run saves its outputs in a new `work/redemption-verification.*` directory.
 
 `VERIFY_NATIVE_V2_PROOF=1 ./verify-redemption.sh` also proves the redemption statement against the root extracted after both burns. Set `REUSE_REDEMPTION=1` to reverify a saved receipt. The v2 fixture uses public burns and synthetic genesis. `VERIFY_NATIVE_REDEMPTION=1` uses the historical actor and runs the separate genuine private PPE burn case with the same commitment format (set `REUSE_PROOFS=1` to use saved PPE receipts). All addresses and secrets in these fixtures are publicly known test values.
 

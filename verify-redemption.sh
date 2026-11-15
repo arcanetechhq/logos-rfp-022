@@ -3,6 +3,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$(cd "$HERE/../.." && pwd)/work"
 BOOTSTRAP_ONLY=1 "$HERE/reproduce.sh"
+RUN="$(mktemp -d "$WORK/redemption-verification.XXXXXX")"
+mkdir -p "$RUN/evidence"
 cd "$HERE"
 export RISC0_HOME="$WORK/risc0" RISC0_BUILD_LOCKED=1
 export RISC0_DEV_MODE=0 RISC0_PROVER=ipc RISC0_EXECUTOR=ipc
@@ -11,9 +13,7 @@ export RUSTFLAGS=--cap-lints=allow CARGO_TARGET_DIR="$HERE/target"
 
 cargo +1.98.1 test --locked --manifest-path redemption/Cargo.toml -p redemption-core
 cargo +1.98.1 build --locked --manifest-path redemption/Cargo.toml -p redemption-runner
-EXECUTE_ONLY=1 ./target/debug/redemption-runner
 cargo +1.98.1 build --locked --features bridge --bin bridge-exits
-./target/debug/bridge-exits | tee evidence/redemption-actor-tests.log
 
 # Use published, pinned EVM verifier bytecode generated from its source, in a local EVM.
 EVM="$WORK/redemption-evm"
@@ -28,16 +28,35 @@ if [ ! -f "$EVM/upstream/contracts/src/groth16/ControlID.sol" ]; then
   tar -xzf "$EVM/risc0-ethereum.tgz" --strip-components=1 -C "$EVM/upstream"
 fi
 
-if [ "${VERIFY_NATIVE_V2_PROOF:-0}" = 1 ]; then
-  PROOF_LOG=redemption-native-v2-generation
-  if [ -n "${REUSE_REDEMPTION:-}" ]; then PROOF_LOG=redemption-native-v2-reverification; fi
-  NATIVE_V2_REDEMPTION=1 ./target/debug/redemption-runner | tee "evidence/$PROOF_LOG.log"
-fi
-
-UWS_USE_FALLBACK=1 node redemption/evm/test/vault.cjs "$EVM" | tee evidence/redemption-evm-tests.log
-
 if [ "${VERIFY_NATIVE_REDEMPTION:-0}" = 1 ]; then
   cargo +1.98.1 build --locked --bin reverse-settlement-prototype
-  NATIVE_REDEMPTION_FIXTURE=1 ./target/debug/reverse-settlement-prototype | tee evidence/redemption-native-settlement.log
-  NATIVE_REDEMPTION_FIXTURE=1 ./target/debug/redemption-runner | tee evidence/redemption-native-proof.log
+fi
+cd "$RUN"
+echo "Verification evidence: $RUN/evidence"
+EXECUTE_ONLY=1 "$HERE/target/debug/redemption-runner"
+"$HERE/target/debug/bridge-exits" | tee evidence/redemption-actor-tests.log
+
+if [ "${VERIFY_NATIVE_V2_PROOF:-0}" = 1 ]; then
+  PROOF_LOG=redemption-native-v2-generation
+  if [ -n "${REUSE_REDEMPTION:-}" ]; then
+    cp "$HERE/evidence/redemption-native-v2-receipt.borsh" evidence/
+    PROOF_LOG=redemption-native-v2-reverification
+  fi
+  NATIVE_V2_REDEMPTION=1 "$HERE/target/debug/redemption-runner" | tee "evidence/$PROOF_LOG.log"
+fi
+
+if [ "${VERIFY_GROTH16:-0}" = 1 ] && [ ! -f evidence/redemption-native-v2-evm-seal.bin ]; then
+  cp "$HERE/evidence/"redemption-native-v2-{evm-seal.bin,image-id.bin,journal.borsh} evidence/
+fi
+UWS_USE_FALLBACK=1 node "$HERE/redemption/evm/test/vault.cjs" "$EVM" | tee evidence/redemption-evm-tests.log
+
+if [ "${VERIFY_NATIVE_REDEMPTION:-0}" = 1 ]; then
+  if [ -n "${REUSE_PROOFS:-}" ]; then
+    cp "$HERE/evidence/"{shield,redemption-native-burn}.borsh evidence/
+  fi
+  if [ -n "${REUSE_REDEMPTION:-}" ]; then
+    cp "$HERE/evidence/redemption-native-receipt.borsh" evidence/
+  fi
+  NATIVE_REDEMPTION_FIXTURE=1 "$HERE/target/debug/reverse-settlement-prototype" | tee evidence/redemption-native-settlement.log
+  NATIVE_REDEMPTION_FIXTURE=1 "$HERE/target/debug/redemption-runner" | tee evidence/redemption-native-proof.log
 fi

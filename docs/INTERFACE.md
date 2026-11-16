@@ -39,7 +39,13 @@ A user proof would consume the SAME accepted common exit root/window and prove s
 - **Trusted checkpoint provider:** native bootstrap permits this, but trusting an additional provider for the starting ledger/LIB violates the requested strict bridge model unless an independently verified on-Ethereum anchor already authenticates it. A checkpoint root supplied by the prover is insufficient.
 - **Fork choice:** one valid branch, even with native PoL and depth k, does not prove canonicality. Native bootstrap compares branches and has network/prolonged-bootstrap assumptions; online LIB depends on successful initialization. A prover cannot prove it saw every relevant competing fork simply by submitting a transcript.
 
-No native source-finality verifier is implemented here. No RPC LIB, channel-key signature or chosen depth can create an accepted Ethereum anchor in this code. Consequently release remains unavailable even after the real fragment proof verifies.
+## Native source replay
+
+`native-auth::source_replay::SourceReplay` rebuilds the ledger from a native genesis transaction and checks the genesis header against the locally expected ID. The era schedule is local configuration. For each supplied block it checks the native body commitment and header signature, applies the ledger and its Proof of Leadership and transaction proofs, and runs the native bootstrap fork choice. Ledger state is retained by block ID, so each branch uses its own parent state. The result identifies any blocks removed or adopted by fork choice. Applied events identify their block and can be provisional. The replay rejects blocks carrying uncles until it can reuse the native uncle validation path.
+
+The regression test uses a local fixture chain with genuine Logos Groth16 leadership proofs. It includes an inscription containing the bytes of the existing LEZ burn block, verifies the resulting Mantle channel tip and checks that the inscription disappears from the selected history when the competing branch takes over. Starting the engine online directly in the test produces different LIBs for the isolated and expanded views. The public replay API stays in bootstrap and returns no LIB or source checkpoint.
+
+Ethereum still needs a source-finality rule that authenticates canonical Logos history under the RFP trust model. A zk proof of this replay could prove that the supplied blocks execute and that fork choice selected one of them. The verifier would still need an authenticated basis for treating that selection as final, such as a protocol-native commitment to a finalized header. Any construction based on another observation or challenge mechanism needs an explicit security argument for its synchronization and participation assumptions. After that decision, the source guest must also connect the finalized header to executed LEZ state and its exit root. The vault requires that proof before it can release funds.
 
 ## Concrete requests to Logos
 

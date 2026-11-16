@@ -6,8 +6,11 @@ mod lez_blocks;
 use common::transaction::LeeTransaction;
 use lee::{FeeDeclaration, PrivateKey, PublicKey, PublicTransaction, V03State, public_transaction};
 use lee_core::account::{AccountId, Actor};
-use redemption_actor::{ExitState, Message, TOKEN, read_balance, read_exit_state, sink};
-use redemption_core::{ExitTree, burn_leaf, membership};
+use redemption_actor::{
+    EXIT_SELECTOR, ExitState, Message, TOKEN, read_balance, read_exit_state, sink,
+};
+use redemption_core::{ExitTree, burn_leaf};
+use reverse_settlement_prototype::exit_index::ExitIndex;
 use std::{borrow::Cow, collections::BTreeMap};
 
 fn signed_call(
@@ -73,7 +76,7 @@ fn main() {
     let get_balance =
         |state: &V03State| read_balance(state.get_account_by_id(owner).data.actor_state(TOKEN));
     assert_eq!(read_tree(&state), expected);
-    let mut leaves = Vec::new();
+    let mut exit_index = ExitIndex::default();
     for (index, (amount, binding)) in [(payout.amount, binding), (30, [0x11; 32])]
         .into_iter()
         .enumerate()
@@ -90,20 +93,37 @@ fn main() {
             },
         );
         let block = lez_blocks::build_block(&state, tip.as_ref(), vec![tx]);
-        lez_blocks::accept(&mut state, &mut tip, &block).unwrap();
+        let events = lez_blocks::accept(&mut state, &mut tip, &block).unwrap();
         assert!(block.body.receipts[0].success);
-        let leaf = burn_leaf(TOKEN.as_ref().try_into().unwrap(), amount, binding);
-        assert_eq!(expected.tree.append(leaf).unwrap(), index as u32);
-        leaves.push(leaf);
-        assert_eq!(read_tree(&state), expected);
+        let exits: Vec<_> = events
+            .iter()
+            .filter(|group| group.tx_index == 0)
+            .flat_map(|group| &group.events)
+            .filter(|entry| entry.account_id == TOKEN && entry.event.selector == EXIT_SELECTOR)
+            .map(|entry| {
+                borsh::from_slice::<(u32, redemption_core::Hash)>(&entry.event.data).unwrap()
+            })
+            .collect();
+        let [(position, leaf)] = exits.as_slice() else {
+            panic!("each accepted burn emits one sequenced exit");
+        };
+        assert_eq!(
+            *leaf,
+            burn_leaf(TOKEN.as_ref().try_into().unwrap(), amount, binding)
+        );
+        assert_eq!(expected.tree.append(*leaf).unwrap(), *position);
+        assert_eq!(*position, index as u32);
+        let committed = read_tree(&state);
+        assert_eq!(committed, expected);
+        exit_index.apply(&exits, committed.tree.root()).unwrap();
     }
-    assert_eq!(membership(&leaves, 0).unwrap().0, expected.tree.root());
+    assert_eq!(exit_index.membership(0).unwrap().0, expected.tree.root());
     assert_eq!(get_balance(&state), 30);
     let committed = read_tree(&state);
     let snapshot = fixture::AppliedExitSnapshot {
         block_hash: tip.as_ref().unwrap().hash.0,
         state_digest: redemption_core::state_commitment(&borsh::to_vec(&state).unwrap()),
-        leaves,
+        leaves: exit_index.leaves().to_vec(),
         root: committed.tree.root(),
     };
     std::fs::write(
@@ -112,7 +132,7 @@ fn main() {
     )
     .unwrap();
     println!(
-        "PASS two native LEZ burns advance a persistent incremental tree and debit wrapped balances"
+        "PASS replay of two accepted LEZ burn events matches the persistent exit tree and balance debits"
     );
 
     for (actor, call) in [
@@ -143,8 +163,13 @@ fn main() {
     ] {
         let tx = signed_call(&state, &key, owner, actor, call);
         let block = lez_blocks::build_block(&state, tip.as_ref(), vec![tx]);
-        lez_blocks::accept(&mut state, &mut tip, &block).unwrap();
+        let events = lez_blocks::accept(&mut state, &mut tip, &block).unwrap();
         assert!(!block.body.receipts[0].success);
+        assert!(
+            !events.iter().flat_map(|group| &group.events).any(|entry| {
+                entry.account_id == TOKEN && entry.event.selector == EXIT_SELECTOR
+            })
+        );
         assert_eq!(get_balance(&state), 30);
         assert_eq!(read_tree(&state), expected);
     }

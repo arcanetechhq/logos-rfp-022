@@ -12,6 +12,7 @@ export RISC0_SERVER_PATH="$WORK/tools/r0vm"
 export RUSTFLAGS=--cap-lints=allow CARGO_TARGET_DIR="$HERE/target"
 
 cargo +1.98.1 test --locked --manifest-path redemption/Cargo.toml -p redemption-core
+cargo +1.98.1 test --locked --lib
 cargo +1.98.1 build --locked --manifest-path redemption/Cargo.toml -p redemption-runner
 cargo +1.98.1 build --locked --features bridge --bin bridge-exits
 

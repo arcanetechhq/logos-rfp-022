@@ -1,2 +1,2 @@
-PASS two native LEZ burns advance a persistent incremental tree and debit wrapped balances
+PASS replay of two accepted LEZ burn events matches the persistent exit tree and balance debits
 PASS overspend, foreign pairing and unauthorized append leave both wrapped balance and exit root intact

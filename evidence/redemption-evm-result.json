@@ -1,0 +1,17 @@
+{
+  "risc0_evm_verifier": "v3.1.0",
+  "amd64_wrap_image": "risczero/risc0-groth16-prover:v2026-10-20.1",
+  "image_manifest_sha256": "e8c2068fb34bbc41447255aa980a89cbb7d6e5a80c0d66041264431f2a955e47",
+  "first_wrap_container_exit": 137,
+  "successful_wrap_environment": {
+    "GOMAXPROCS": 3,
+    "GOMEMLIMIT": "5GiB",
+    "container_memory": "7g"
+  },
+  "seal_size_bytes": 260,
+  "seal_sha256": "0912c9adba774ad1a09576f9c7ac507915c58241cfd53b836a15667cd5122c89",
+  "redemption_receipt_verified_in_local_evm": true,
+  "verifier_call_transaction_gas": 251671,
+  "source_checkpoint_advanced": false,
+  "vault_release_executed": false
+}

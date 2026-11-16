@@ -153,6 +153,9 @@ async function main() {
       const journal = fs.readFileSync(prefix + "-journal.borsh");
       const digest = ethers.sha256(journal);
       await verifier.verify.staticCall(seal, imageId, digest);
+      await expectRevert(() => pending.advanceCheckpoint.staticCall(repeated(6, 32), repeated(7, 32), 1, seal));
+      assert.equal(await pending.sourceSlot(), 0n);
+      assert.equal(await pending.authenticatedRoots(repeated(7, 32)), false);
       const sent = await signer.sendTransaction({
         to: await verifier.getAddress(),
         data: verifier.interface.encodeFunctionData("verify", [seal, imageId, digest]),

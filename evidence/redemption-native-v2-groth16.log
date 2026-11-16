@@ -1,0 +1,2 @@
+PASS cached redemption receipt cryptographically reverified
+PASS wrapped Groth16 receipt: seal_bytes=260

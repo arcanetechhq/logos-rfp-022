@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = run ] && [ "${!#}" = risczero/risc0-groth16-prover:v2026-10-20.1 ]; then
+  shift
+  exec "${RFP022_REAL_DOCKER:?set Docker path}" run \
+    --env GOMAXPROCS=3 --env GOMEMLIMIT=5GiB --memory=7g "$@"
+fi
+exec "${RFP022_REAL_DOCKER:?set Docker path}" "$@"

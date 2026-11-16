@@ -1,5 +1,3 @@
-Using µWS fallback implementation due to UWS_USE_FALLBACK environment flag being enabled; performance may be degraded.
-
-
 PASS actual RISC Zero v3.1.0 EVM verifier rejects forged source checkpoint atomically
 PASS Solidity decodes exact Rust guest journal and rejects noncanonical length
+PASS local EVM verifies the real redemption proof, verification gas used=251671

@@ -37,6 +37,11 @@ echo "Verification evidence: $RUN/evidence"
 EXECUTE_ONLY=1 "$HERE/target/debug/redemption-runner"
 "$HERE/target/debug/bridge-exits" | tee evidence/redemption-actor-tests.log
 
+if [ "${WRAP_GROTH16:-0}" = 1 ] && [ "${LIMIT_WRAP_MEMORY:-0}" = 1 ]; then
+  export RFP022_REAL_DOCKER="$(command -v docker)"
+  export PATH="$HERE/scripts/redemption-prover:$PATH"
+fi
+
 if [ "${VERIFY_NATIVE_V2_PROOF:-0}" = 1 ]; then
   PROOF_LOG=redemption-native-v2-generation
   if [ -n "${REUSE_REDEMPTION:-}" ]; then

@@ -8,6 +8,8 @@ Run `./verify-redemption.sh` from this repository. It builds the pinned guests, 
 
 `VERIFY_NATIVE_V2_PROOF=1 ./verify-redemption.sh` also proves the redemption statement against the root extracted after both burns. Set `REUSE_REDEMPTION=1` to reverify a saved receipt. The v2 fixture uses public burns and synthetic genesis. `VERIFY_NATIVE_REDEMPTION=1` uses the historical actor and runs the separate genuine private PPE burn case with the same commitment format (set `REUSE_PROOFS=1` to use saved PPE receipts). All addresses and secrets in these fixtures are publicly known test values.
 
+The v2 receipt also verified on the local EVM after wrapping to a 260-byte Groth16 seal. The official verifier used **251,671 gas** for the transaction calling it directly. Changing the journal or image ID failed, and the same valid seal could not advance the vault's source checkpoint. `VERIFY_NATIVE_V2_PROOF=1 REUSE_REDEMPTION=1 VERIFY_GROTH16=1 ./verify-redemption.sh` verifies the saved evidence without Docker. To regenerate the seal, also set `WRAP_GROTH16=1` and run the supported RISC Zero Docker image. On the tested macOS arm64 host the amd64 container needed `DOCKER_DEFAULT_PLATFORM=linux/amd64 LIMIT_WRAP_MEMORY=1`.
+
 ## State and claims
 
 1. The LEZ actor debits the holder and synchronously appends a leaf. The exit PDA's initialized pairing and native program ownership are checked at the append. Invalid appends and overspends revert the debit. The public PDA stores a 32-level frontier, count and root in constant space. The append event contains the position and leaf so any wallet can reconstruct paths. The local exit index checks order and commits a batch only if replay matches the root read from applied LEZ state.

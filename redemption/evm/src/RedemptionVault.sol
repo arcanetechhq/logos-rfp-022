@@ -4,6 +4,7 @@ pragma solidity 0.8.30;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {CheckpointContest} from "./CheckpointContest.sol";
 
 /// ABI of the released RISC Zero Ethereum verifier. An invalid proof must revert.
 interface IRiscZeroVerifier {
@@ -11,9 +12,10 @@ interface IRiscZeroVerifier {
 }
 
 /// One immutable Logos program / Ethereum asset pairing.
-/// The source guest must prove canonical history, full LEZ acceptance and exit root derivation.
+/// The pinned source image verifies the direct or contest statement for this deployment.
 contract RedemptionVault is ReentrancyGuard {
     using SafeERC20 for IERC20;
+    using CheckpointContest for CheckpointContest.State;
 
     error BadConfiguration();
     error SourceHistoryUnavailable();
@@ -26,10 +28,15 @@ contract RedemptionVault is ReentrancyGuard {
     error TransferFailed();
 
     event CheckpointAdvanced(bytes32 indexed checkpoint, uint64 indexed slot, bytes32 indexed exitRoot);
+    event CheckpointProposed(bytes32 indexed candidateId, uint64 indexed observationTime, uint256 deadline);
+    event CheckpointChallenged(bytes32 indexed previousId, bytes32 indexed candidateId, uint256 deadline);
+    event CheckpointContestClosed(bytes32 indexed candidateId);
     event Deposited(uint256 indexed depositId, bytes32 commitment, uint128 amount);
     event Redeemed(bytes32 indexed nullifier, address indexed recipient, uint128 amount);
 
     uint256 internal constant REDEMPTION_JOURNAL_BYTES = 188;
+    bytes32 public constant PROPOSAL_JOURNAL = keccak256("RFP022/source/proposal/v1");
+    bytes32 public constant CHALLENGE_JOURNAL = keccak256("RFP022/source/challenge/v1");
     struct Release {
         bytes32 pairing;
         bytes32 root;
@@ -42,6 +49,8 @@ contract RedemptionVault is ReentrancyGuard {
     }
     IRiscZeroVerifier public immutable verifier;
     bytes32 public immutable sourceImageId;
+    bytes32 public immutable challengeImageId;
+    uint64 public immutable challengePeriod;
     bytes32 public immutable redemptionImageId;
     bytes32 public immutable pairingId;
     address public immutable token; // zero is ETH
@@ -51,6 +60,7 @@ contract RedemptionVault is ReentrancyGuard {
     uint64 public sourceSlot;
     uint256 public escrowed;
     uint256 public depositCount;
+    CheckpointContest.State private contest;
     mapping(bytes32 => bool) public authenticatedRoots;
     mapping(bytes32 => bool) public spent;
     mapping(uint128 => bool) public denomination;
@@ -64,13 +74,20 @@ contract RedemptionVault is ReentrancyGuard {
         bytes32 zone,
         bytes32 bridgeProgram,
         address token_,
-        uint128[] memory denominations
+        uint128[] memory denominations,
+        bytes32 challengeImageId_,
+        uint64 challengePeriod_
     ) {
         if (
             address(verifier_).code.length == 0 || redemptionImageId_ == bytes32(0)
                 || sourceImageId_ == redemptionImageId_ || initialCheckpoint == bytes32(0)
                 || logosGenesis == bytes32(0) || zone == bytes32(0) || bridgeProgram == bytes32(0)
                 || denominations.length == 0 || (token_ != address(0) && token_.code.length == 0)
+                || ((challengePeriod_ == 0) != (challengeImageId_ == bytes32(0)))
+                || (challengePeriod_ != 0 && (
+                    sourceImageId_ == bytes32(0) || challengeImageId_ == sourceImageId_
+                        || challengeImageId_ == redemptionImageId_
+                ))
         ) revert BadConfiguration();
         for (uint256 i; i < denominations.length; ++i) {
             uint128 value = denominations[i];
@@ -79,6 +96,8 @@ contract RedemptionVault is ReentrancyGuard {
         }
         verifier = verifier_;
         sourceImageId = sourceImageId_;
+        challengeImageId = challengeImageId_;
+        challengePeriod = challengePeriod_;
         redemptionImageId = redemptionImageId_;
         destinationChain = block.chainid;
         token = token_;
@@ -99,18 +118,91 @@ contract RedemptionVault is ReentrancyGuard {
     /// The source proof's journal is ABI(pairing, previous, next, exitRoot, finalizedSlot).
     /// The verifier image is pinned at deployment. Zero leaves the vault disabled.
     function advanceCheckpoint(bytes32 next, bytes32 exitRoot, uint64 finalizedSlot, bytes calldata seal) external {
-        if (sourceImageId == bytes32(0) || destinationChain != block.chainid) {
+        _requireSourceMode(false);
+        bytes32 previous = checkpoint;
+        _checkAdvance(next, exitRoot, finalizedSlot);
+        verifier.verify(seal, sourceImageId, sha256(abi.encode(pairingId, previous, next, exitRoot, finalizedSlot)));
+        _authenticate(next, exitRoot, finalizedSlot);
+    }
+
+    function pendingCheckpoint() external view returns (CheckpointContest.State memory) {
+        return contest;
+    }
+
+    /// The observation time fixes the comparison horizon for the whole contest.
+    function proposeCheckpoint(
+        CheckpointContest.Candidate calldata candidate,
+        uint64 observationTime,
+        bytes calldata history,
+        bytes calldata seal
+    ) external {
+        _requireSourceMode(true);
+        _checkHistory(candidate.history, history);
+        _checkAdvance(candidate.checkpoint, candidate.exitRoot, candidate.slot);
+        contest.open(candidate, observationTime, challengePeriod);
+        bytes32 candidateId = CheckpointContest.candidateId(observationTime, candidate);
+        verifier.verify(
+            seal,
+            sourceImageId,
+            sha256(abi.encode(PROPOSAL_JOURNAL, pairingId, checkpoint, sourceSlot, candidateId))
+        );
+        emit CheckpointProposed(candidateId, observationTime, contest.deadline);
+    }
+
+    /// The comparison proof must prefer the challenger at the same observation
+    /// time. It may prove that the previous checkpoint still has to be retained.
+    function challengeCheckpoint(
+        bytes32 expectedCandidateId,
+        CheckpointContest.Candidate calldata challenger,
+        bytes calldata history,
+        bytes calldata seal
+    ) external {
+        _requireSourceMode(true);
+        _checkHistory(challenger.history, history);
+        if (challenger.history == contest.candidate.history) revert InvalidCheckpoint();
+        if (challenger.checkpoint != checkpoint || challenger.slot != sourceSlot || challenger.exitRoot != bytes32(0)) {
+            _checkAdvance(challenger.checkpoint, challenger.exitRoot, challenger.slot);
+        }
+        contest.replace(challenger, expectedCandidateId, challengePeriod);
+        bytes32 candidateId = CheckpointContest.candidateId(contest.observationTime, challenger);
+        verifier.verify(seal, challengeImageId, _challengeDigest(expectedCandidateId, candidateId));
+        emit CheckpointChallenged(expectedCandidateId, candidateId, contest.deadline);
+    }
+
+    function finalizeCheckpoint(bytes32 expectedCandidateId) external {
+        _requireSourceMode(true);
+        CheckpointContest.Candidate memory winner = contest.close(expectedCandidateId);
+        if (winner.slot > sourceSlot) {
+            _authenticate(winner.checkpoint, winner.exitRoot, winner.slot);
+        }
+        emit CheckpointContestClosed(expectedCandidateId);
+    }
+
+    function _requireSourceMode(bool optimistic) private view {
+        if (sourceImageId == bytes32(0) || destinationChain != block.chainid || optimistic != (challengePeriod != 0)) {
             revert SourceHistoryUnavailable();
         }
-        bytes32 previous = checkpoint;
-        if (next == bytes32(0) || next == previous || exitRoot == bytes32(0) || finalizedSlot <= sourceSlot) {
+    }
+
+    function _checkAdvance(bytes32 next, bytes32 exitRoot, uint64 slot) private view {
+        if (next == bytes32(0) || next == checkpoint || exitRoot == bytes32(0) || slot <= sourceSlot) {
             revert InvalidCheckpoint();
         }
-        verifier.verify(seal, sourceImageId, sha256(abi.encode(pairingId, previous, next, exitRoot, finalizedSlot)));
+    }
+
+    function _checkHistory(bytes32 commitment, bytes calldata history) private pure {
+        if (history.length == 0 || sha256(history) != commitment) revert InvalidCheckpoint();
+    }
+
+    function _challengeDigest(bytes32 incumbent, bytes32 challenger) private view returns (bytes32) {
+        return sha256(abi.encode(CHALLENGE_JOURNAL, pairingId, checkpoint, sourceSlot, incumbent, challenger));
+    }
+
+    function _authenticate(bytes32 next, bytes32 exitRoot, uint64 slot) private {
         checkpoint = next;
-        sourceSlot = finalizedSlot;
+        sourceSlot = slot;
         authenticatedRoots[exitRoot] = true;
-        emit CheckpointAdvanced(next, finalizedSlot, exitRoot);
+        emit CheckpointAdvanced(next, slot, exitRoot);
     }
 
     /// The deposit event commits to an opaque claim note. The inbound LEZ program consumes its attestation.

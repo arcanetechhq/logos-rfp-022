@@ -40,7 +40,7 @@ const input = {
         constructor(IRiscZeroVerifier v) RedemptionVault(
           v, bytes32(0), bytes32(uint256(1)), bytes32(uint256(2)),
           bytes32(uint256(3)), bytes32(uint256(4)), bytes32(uint256(5)),
-          address(0), _denominations()
+          address(0), _denominations(), bytes32(0), 0
         ) {}
         function _denominations() private pure returns (uint128[] memory values) {
           values = new uint128[](1);
@@ -48,6 +48,26 @@ const input = {
         }
         function decode(bytes calldata journal) external pure returns (Release memory) {
           return _decode(journal);
+        }
+      }`
+    },
+    "test/ContestProbe.sol": {
+      content: `
+      // SPDX-License-Identifier: MIT
+      pragma solidity 0.8.30;
+      import "../src/CheckpointContest.sol";
+      contract ContestProbe {
+        using CheckpointContest for CheckpointContest.State;
+        CheckpointContest.State private state;
+        function getRound() external view returns (CheckpointContest.State memory) { return state; }
+        function open(CheckpointContest.Candidate calldata candidate, uint64 observed, uint64 period) external {
+          state.open(candidate, observed, period);
+        }
+        function replace(CheckpointContest.Candidate calldata candidate, bytes32 expected, uint64 period) external {
+          state.replace(candidate, expected, period);
+        }
+        function close(bytes32 expected) external returns (CheckpointContest.Candidate memory) {
+          return state.close(expected);
         }
       }`
     }
@@ -79,10 +99,69 @@ async function expectRevert(action, selector) {
   });
 }
 
+function selector(signature) {
+  return ethers.id(signature).slice(0, 10);
+}
+
+function candidateId(observation, candidate) {
+  return ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(
+    ["uint64", "tuple(bytes32 history,bytes32 checkpoint,bytes32 exitRoot,uint64 slot)"],
+    [observation, candidate],
+  ));
+}
+
+async function contestLifecycle(chain, probe, other) {
+  const period = 600n;
+  const time = async () => BigInt((await chain.request({
+    method: "eth_getBlockByNumber", params: ["latest", false],
+  })).timestamp);
+  const mineAt = async timestamp => {
+    await chain.request({ method: "evm_mine", params: [Number(timestamp)] });
+    assert.equal(await time(), timestamp);
+  };
+  const observed = await time();
+  const candidate = [repeated(1, 32), repeated(2, 32), repeated(3, 32), 1n];
+  const hold = [repeated(4, 32), repeated(5, 32), ethers.ZeroHash, 0n];
+  const originalId = candidateId(observed, candidate);
+  const holdId = candidateId(observed, hold);
+  await expectRevert(() => probe.open.staticCall(candidate, observed + 10n, period),
+    selector("InvalidObservationTime()"));
+  await expectRevert(() => probe.open.staticCall(candidate, observed - period, period),
+    selector("InvalidObservationTime()"));
+  await (await probe.open(candidate, observed, period)).wait();
+  const firstDeadline = (await probe.getRound()).deadline;
+  await expectRevert(() => probe.open.staticCall(candidate, observed, period), selector("ContestAlreadyOpen()"));
+  await expectRevert(() => probe.close.staticCall(originalId), selector("ChallengeWindowOpen()"));
+  await expectRevert(() => probe.replace.staticCall(hold, ethers.ZeroHash, period), selector("CandidateChanged()"));
+  await mineAt(firstDeadline - 10n);
+  await (await probe.connect(other).replace(hold, originalId, period)).wait();
+  const replaced = await probe.getRound();
+  assert.equal(replaced.observationTime, observed);
+  assert.equal(replaced.candidate.history, hold[0]);
+  assert.equal(replaced.deadline, await time() + period);
+  assert.ok(replaced.deadline > firstDeadline);
+  await mineAt(firstDeadline);
+  await expectRevert(() => probe.close.staticCall(holdId), selector("ChallengeWindowOpen()"));
+  await mineAt(replaced.deadline);
+  await expectRevert(() => probe.replace.staticCall(candidate, holdId, period),
+    selector("ChallengeWindowClosed()"));
+  await expectRevert(() => probe.close.staticCall(originalId), selector("CandidateChanged()"));
+  assert.deepEqual(Array.from(await probe.close.staticCall(holdId)), hold);
+  await (await probe.connect(other).close(holdId)).wait();
+  assert.equal((await probe.getRound()).deadline, 0n);
+  assert.equal((await probe.getRound()).observationTime, observed);
+  await expectRevert(() => probe.close.staticCall(holdId), selector("NoOpenContest()"));
+  await expectRevert(() => probe.open.staticCall(candidate, observed, period),
+    selector("InvalidObservationTime()"));
+  await (await probe.open(candidate, await time(), period)).wait();
+  console.log("PASS contest timing, late replacement, stale calls, hold result and fresh next round");
+}
+
 async function main() {
   const chain = ganache.provider({ logging: { quiet: true }, chain: { chainId: 31337 } });
   try {
     const provider = new ethers.BrowserProvider(chain);
+    provider.pollingInterval = 50;
     const signer = await provider.getSigner();
     async function deploy(source, name, args) {
       const code = compiled.contracts[source][name];
@@ -96,7 +175,7 @@ async function main() {
     const verifier = await deploy(selected, "RiscZeroGroth16Verifier", [root, control]);
     const common = [repeated(5, 32), repeated(1, 32), repeated(2, 32), repeated(0x42, 32), ethers.ZeroAddress, [40]];
     const vault = await deploy("src/RedemptionVault.sol", "RedemptionVault",
-      [await verifier.getAddress(), ethers.ZeroHash, repeated(8, 32), ...common]);
+      [await verifier.getAddress(), ethers.ZeroHash, repeated(8, 32), ...common, ethers.ZeroHash, 0]);
     const expectedPairing = ethers.sha256(ethers.solidityPacked(
       ["string", "bytes32", "bytes32", "bytes32", "uint256", "address", "address"],
       ["RFP022/pairing/v1", common[1], common[2], common[3], 31337, await vault.getAddress(), ethers.ZeroAddress],
@@ -108,7 +187,7 @@ async function main() {
     await expectRevert(() => vault.release.staticCall("0x", "0x"), unavailable);
 
     const pending = await deploy("src/RedemptionVault.sol", "RedemptionVault",
-      [await verifier.getAddress(), repeated(9, 32), repeated(8, 32), ...common]);
+      [await verifier.getAddress(), repeated(9, 32), repeated(8, 32), ...common, ethers.ZeroHash, 0]);
     // Exercise the official verifier using its valid seal selector and invalid proof coordinates.
     const invalidSeal = ethers.concat([await verifier.SELECTOR(), new Uint8Array(256)]);
     await expectRevert(() => pending.advanceCheckpoint.staticCall(repeated(6, 32), repeated(7, 32), 1, invalidSeal));
@@ -129,6 +208,33 @@ async function main() {
     await expectRevert(() => pending.deposit.staticCall(repeated(6, 32), 40, {value: 40}), unavailable);
     await expectRevert(() => pending.release.staticCall("0x", invalidSeal), unavailable);
     console.log("PASS actual RISC Zero v3.1.0 EVM verifier rejects forged source checkpoint atomically");
+
+    const optimistic = await deploy("src/RedemptionVault.sol", "RedemptionVault",
+      [await verifier.getAddress(), repeated(9, 32), repeated(8, 32), ...common, repeated(10, 32), 600]);
+    const history = "0x010203";
+    const proposal = [ethers.sha256(history), repeated(6, 32), repeated(7, 32), 1n];
+    const observed = BigInt((await chain.request({ method: "eth_getBlockByNumber", params: ["latest", false] })).timestamp);
+    await expectRevert(() => optimistic.challengeCheckpoint.staticCall(ethers.ZeroHash, proposal, history, invalidSeal),
+      selector("NoOpenContest()"));
+    await expectRevert(() => optimistic.advanceCheckpoint.staticCall(...proposal.slice(1), invalidSeal), unavailable);
+    await expectRevert(() => pending.proposeCheckpoint.staticCall(proposal, observed, history, invalidSeal), unavailable);
+    await expectRevert(() => optimistic.proposeCheckpoint.staticCall(proposal, observed, "0x00", invalidSeal),
+      selector("InvalidCheckpoint()"));
+    await expectRevert(() => optimistic.proposeCheckpoint.staticCall(proposal, observed, history, invalidSeal));
+    await assert.rejects(async () => {
+      const tx = await optimistic.proposeCheckpoint(proposal, observed, history, invalidSeal, { gasLimit: 3_000_000 });
+      await tx.wait();
+    }, error => error.receipt?.status === 0);
+    await expectRevert(() => optimistic.finalizeCheckpoint.staticCall(candidateId(observed, proposal)),
+      selector("NoOpenContest()"));
+    assert.equal((await optimistic.pendingCheckpoint()).deadline, 0n);
+    assert.equal(await optimistic.sourceSlot(), 0n);
+    assert.equal(await optimistic.checkpoint(), common[0]);
+    assert.equal(await optimistic.authenticatedRoots(proposal[2]), false);
+    assert.equal(await optimistic.escrowed(), 0n);
+    await expectRevert(() => optimistic.deposit.staticCall(repeated(6, 32), 40, { value: 40 }), unavailable);
+    const contest = await deploy("test/ContestProbe.sol", "ContestProbe", []);
+    await contestLifecycle(chain, contest, await provider.getSigner(1));
 
     const probe = await deploy("test/DecodingProbe.sol", "DecodingProbe", [await verifier.getAddress()]);
     const bytes = fs.readFileSync("evidence/redemption-encoding-vector.borsh");
@@ -154,6 +260,12 @@ async function main() {
       const digest = ethers.sha256(journal);
       await verifier.verify.staticCall(seal, imageId, digest);
       await expectRevert(() => pending.release.staticCall(journal, seal), unavailable);
+      await expectRevert(() => optimistic.release.staticCall(journal, seal), unavailable);
+      const recentObservation = BigInt((await chain.request({
+        method: "eth_getBlockByNumber", params: ["latest", false],
+      })).timestamp);
+      await expectRevert(() => optimistic.proposeCheckpoint.staticCall(proposal, recentObservation, history, seal));
+      assert.equal((await optimistic.pendingCheckpoint()).deadline, 0n);
       await expectRevert(() => pending.advanceCheckpoint.staticCall(repeated(6, 32), repeated(7, 32), 1, seal));
       assert.equal(await pending.sourceSlot(), 0n);
       assert.equal(await pending.authenticatedRoots(repeated(7, 32)), false);

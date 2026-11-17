@@ -10,6 +10,8 @@ Run `./verify-redemption.sh` from this repository. It builds the pinned guests, 
 
 The v2 receipt also verified on the local EVM after wrapping to a 260-byte Groth16 seal. The official verifier used **251,671 gas** for the transaction calling it directly. Changing the journal or image ID failed, and the same valid seal could not advance the vault's source checkpoint. `VERIFY_NATIVE_V2_PROOF=1 REUSE_REDEMPTION=1 VERIFY_GROTH16=1 ./verify-redemption.sh` verifies the saved evidence without Docker. To regenerate the seal, also set `WRAP_GROTH16=1` and run the supported RISC Zero Docker image. On the tested macOS arm64 host the amd64 container needed `DOCKER_DEFAULT_PLATFORM=linux/amd64 LIMIT_WRAP_MEMORY=1`.
 
+After `BOOTSTRAP_ONLY=1 ./reproduce.sh`, run `RUSTFLAGS=--cap-lints=allow cargo +1.98.1 test --locked --manifest-path native-auth/Cargo.toml --lib` to check Logos source replay with native leadership proofs, a real LEZ block inscription on a fixture chain, and competing valid branches.
+
 ## State and claims
 
 1. The LEZ actor debits the holder and synchronously appends a leaf. The exit PDA's initialized pairing and native program ownership are checked at the append. Invalid appends and overspends revert the debit. The public PDA stores a 32-level frontier, count and root in constant space. The append event contains the position and leaf so any wallet can reconstruct paths. The local exit index checks order and commits a batch only if replay matches the root read from applied LEZ state.
@@ -19,7 +21,7 @@ The v2 receipt also verified on the local EVM after wrapping to a 260-byte Groth
 
 ## Remaining bridge work
 
-The source-history guest and its authenticated production initialization are still missing. That guest must prove the pinned Logos finality and canonicality rules, the LEZ block transitions (including revert handling), and the immutable bridge program plus its pairing and append-only exit state. The local snapshots are diagnostic exports. They cannot authorize an Ethereum root. The local vault test deploys with source verification disabled or with a verifier that fails all supplied source proofs. No test pretends to have finality, and no test moves funds through a fabricated root.
+Host-side Logos replay now validates supplied uncle-free blocks from genesis and reports provisional branch changes. The vault still requires an authenticated source-history proof. Its guest must authenticate Logos finality and canonicality and bind the finalized history to the LEZ execution, including reverts, the immutable bridge program, its pairing and the append-only exit state. See [source replay and canonicality](INTERFACE.md#native-source-replay). The local vault tests keep source history unavailable and confirm that even the valid redemption seal leaves the vault locked.
 
 The escrow sides still need the RFP-021 consumer and atomic mint, wallet recovery, deployment and migration procedure, operational controls and a full integration review. The current actor starts with synthetic balances. A target deployment must supply an audited wrapped-token issuance path and a corresponding verified deposit statement. The one-asset vault is a building block for the registry and fee/cap policy.
 

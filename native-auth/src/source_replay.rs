@@ -30,6 +30,10 @@ pub enum ReplayError {
     UnsupportedUncles,
     #[error("block {0:?} was already applied")]
     AlreadyApplied(HeaderId),
+    #[error("fork comparison requires a single incumbent branch and a nonempty alternative")]
+    InvalidComparison,
+    #[error("alternative blocks do not form a contiguous branch")]
+    NonContiguousFork,
     #[error("block exceeds the transaction count for its era")]
     TransactionCount,
     #[error("invalid block: {0}")]
@@ -84,6 +88,36 @@ impl SourceReplay {
     #[must_use]
     pub fn selected_tip(&self) -> HeaderId {
         self.consensus.tip()
+    }
+
+    /// Compare a single incumbent history with an alternative under the native
+    /// bootstrap rule, applying both at the same slot bound. The result is
+    /// provisional and the original replay is unchanged.
+    pub fn prefers_alternative(
+        &self,
+        alternative: impl IntoIterator<Item = SourceBlock>,
+        observation_slot: Slot,
+    ) -> Result<bool, ReplayError> {
+        let mut alternative = alternative.into_iter().peekable();
+        let first = alternative.peek().ok_or(ReplayError::InvalidComparison)?;
+        if self.consensus.branches().branches().count() != 1 {
+            return Err(ReplayError::InvalidComparison);
+        }
+        if self.consensus.tip_branch().slot() > observation_slot {
+            return Err(ReplayError::FutureSlot);
+        }
+        let mut tip = first.header().parent();
+        let mut comparison = Self {
+            ledger: self.ledger.clone(),
+            consensus: self.consensus.clone(),
+        };
+        for block in alternative {
+            if block.header().parent() != tip {
+                return Err(ReplayError::NonContiguousFork);
+            }
+            tip = comparison.apply(block, observation_slot)?.block_id;
+        }
+        Ok(comparison.selected_tip() == tip)
     }
 
     /// `observation_slot` is a caller-supplied upper bound for this offline

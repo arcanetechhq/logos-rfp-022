@@ -47,6 +47,8 @@ The regression test uses a local fixture chain with genuine Logos Groth16 leader
 
 Ethereum still needs a source-finality rule that authenticates canonical Logos history under the RFP trust model. A zk proof of this replay could prove that the supplied blocks execute and that fork choice selected one of them. The verifier would still need an authenticated basis for treating that selection as final, such as a protocol-native commitment to a finalized header. Any construction based on another observation or challenge mechanism needs an explicit security argument for its synchronization and participation assumptions. After that decision, the source guest must also connect the finalized header to executed LEZ state and its exit root. The vault requires that proof before it can release funds.
 
+The Ethereum vault implements the [optimistic contest](REDEMPTION.md#optimistic-source-checkpoints) as a fallback with an explicit observation assumption. The host comparator checks two supplied histories within a common slot bound using the pinned Cryptarchia bootstrap engine. An on-chain comparison guest still needs a precise rule for observation timing, data availability, bootstrap and repeated replacements before its image can be pinned. The native checkpoint remains the preferred production design.
+
 ## Concrete requests to Logos
 
 1. Stable genesis, era schedule and complete deterministic ledger + Cryptarchia replay/serialization APIs, including UTXO roots, epoch state, uncle validation, transaction proofs and channel configuration history; supported zkVM compilation target and test histories.

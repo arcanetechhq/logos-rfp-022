@@ -169,11 +169,52 @@ fn validates_native_history_and_keeps_branch_changes_provisional() {
     let competing = competing_block.header().id();
     assert_eq!(competing_block.header().slot(), first_slot);
     assert_ne!(competing, first);
+    assert!(
+        !replay
+            .prefers_alternative([competing_block.clone()], observation_slot)
+            .unwrap()
+    );
+    let mut alternative = SourceReplay {
+        ledger: replay.ledger.clone(),
+        consensus: replay.consensus.clone(),
+    };
+    alternative
+        .apply(competing_block.clone(), observation_slot)
+        .unwrap();
+    let competing_child = build_block(
+        &alternative,
+        competing,
+        stake,
+        &stake_key,
+        &other_leader,
+        vec![],
+    );
+    assert!(
+        replay
+            .prefers_alternative(
+                [competing_block.clone(), competing_child.clone()],
+                observation_slot
+            )
+            .unwrap()
+    );
+    assert!(matches!(
+        replay.prefers_alternative(
+            [competing_block.clone(), competing_block.clone()],
+            observation_slot
+        ),
+        Err(ReplayError::NonContiguousFork)
+    ));
+    assert!(matches!(
+        replay.prefers_alternative([competing_block.clone()], Slot::genesis()),
+        Err(ReplayError::FutureSlot)
+    ));
+    assert_eq!(replay.selected_tip(), first);
+    assert!(replay.ledger.state(&competing).is_none());
+
     let update = replay.apply(competing_block, observation_slot).unwrap();
     assert!(update.added_to_selected_branch.is_empty());
     assert_eq!(replay.selected_tip(), first);
 
-    let competing_child = build_block(&replay, competing, stake, &stake_key, &other_leader, vec![]);
     let tip = competing_child.header().id();
     let update = replay.apply(competing_child, observation_slot).unwrap();
     assert_eq!(update.removed_from_selected_branch, [first]);

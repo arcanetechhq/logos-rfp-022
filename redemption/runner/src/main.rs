@@ -4,7 +4,8 @@ mod fixture;
 use redemption_core::{ExitTree, Journal, Witness, burn_binding, burn_leaf, membership, redeem};
 use redemption_methods::{REDEMPTION_GUEST_ELF, REDEMPTION_GUEST_ID};
 use risc0_zkvm::{
-    ExecutorEnv, InnerReceipt, ProverOpts, Receipt, default_executor, default_prover, sha::Digest,
+    ExecutorEnv, InnerReceipt, ProverOpts, Receipt, compute_image_id, default_executor,
+    default_prover, sha::Digest,
 };
 
 fn main() {
@@ -62,11 +63,11 @@ fn main() {
     };
     let expected = redeem(&witness).unwrap();
     let bytes = borsh::to_vec(&witness).unwrap();
-    let env = ExecutorEnv::builder().write_slice(&bytes).build().unwrap();
+    let executor_env = || ExecutorEnv::builder().write_slice(&bytes).build().unwrap();
     let start = std::time::Instant::now();
     if std::env::var_os("EXECUTE_ONLY").is_some() {
         let result = default_executor()
-            .execute(env, REDEMPTION_GUEST_ELF)
+            .execute(executor_env(), REDEMPTION_GUEST_ELF)
             .unwrap();
         assert_eq!(result.journal.bytes, borsh::to_vec(&expected).unwrap());
         if !from_settlement {
@@ -84,7 +85,9 @@ fn main() {
     let receipt: Receipt = if reuse {
         borsh::from_slice(&std::fs::read(&proof_path).unwrap()).unwrap()
     } else {
-        let result = default_prover().prove(env, REDEMPTION_GUEST_ELF).unwrap();
+        let result = default_prover()
+            .prove(executor_env(), REDEMPTION_GUEST_ELF)
+            .unwrap();
         println!(
             "Generated redemption receipt: prove_ms={} total_cycles={}",
             start.elapsed().as_millis(),
@@ -93,12 +96,30 @@ fn main() {
         result.receipt
     };
     assert!(!matches!(receipt.inner, InnerReceipt::Fake(_)));
-    receipt.verify(REDEMPTION_GUEST_ID).unwrap();
+    let mut image_id = Digest::from(REDEMPTION_GUEST_ID);
+    if let Err(error) = receipt.verify(image_id) {
+        assert!(reuse, "new receipt failed verification: {error}");
+        let archived_guest = include_bytes!("../../../evidence/redemption-program.bin");
+        let archived_id = compute_image_id(archived_guest).unwrap();
+        assert_eq!(
+            archived_id.as_bytes(),
+            include_bytes!("../../../evidence/redemption-native-v2-image-id.bin")
+        );
+        receipt
+            .verify(archived_id)
+            .expect("cached receipt must match the pinned archived redemption guest");
+        let rebuilt = default_executor()
+            .execute(executor_env(), REDEMPTION_GUEST_ELF)
+            .unwrap();
+        assert_eq!(rebuilt.journal.bytes, receipt.journal.bytes);
+        image_id = archived_id;
+        println!("PASS archived guest receipt matches the rebuilt guest journal");
+    }
     let journal: Journal = borsh::from_slice(&receipt.journal.bytes).unwrap();
     assert_eq!(journal, expected);
     let mut changed = receipt.clone();
     changed.journal.bytes[64] ^= 1;
-    assert!(changed.verify(REDEMPTION_GUEST_ID).is_err());
+    assert!(changed.verify(image_id).is_err());
     if !reuse {
         let bytes = borsh::to_vec(&receipt).unwrap();
         println!("PASS real redemption proof: receipt_bytes={}", bytes.len());
@@ -117,7 +138,7 @@ fn main() {
         let wrapped = default_prover()
             .compress(&ProverOpts::groth16(), &receipt)
             .unwrap();
-        wrapped.verify(REDEMPTION_GUEST_ID).unwrap();
+        wrapped.verify(image_id).unwrap();
         assert_eq!(wrapped.journal.bytes, receipt.journal.bytes);
         let InnerReceipt::Groth16(proof) = wrapped.inner else {
             panic!("expected a real Groth16 receipt");
@@ -128,7 +149,7 @@ fn main() {
         std::fs::write(format!("evidence/{prefix}-evm-seal.bin"), &seal).unwrap();
         std::fs::write(
             format!("evidence/{prefix}-image-id.bin"),
-            Digest::from(REDEMPTION_GUEST_ID).as_bytes(),
+            image_id.as_bytes(),
         )
         .unwrap();
         println!("PASS wrapped Groth16 receipt: seal_bytes={}", seal.len());

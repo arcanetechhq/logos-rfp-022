@@ -32,7 +32,7 @@ The [verification guide](docs/REDEMPTION.md#check-the-code) covers fresh proof g
 ## What remains for the grant
 
 - **Logos → Ethereum.** The vault still needs an authenticated proof linking the canonical Logos history to the executed LEZ exit root. A protocol-native checkpoint verifiable by Ethereum is the preferred production design. The prototype's challenge-window fallback adds an assumption that a participant can observe a better branch, produce a challenge proof and have it included before the deadline. Its source proposal and comparison guests remain to be built.
-- **Ethereum → LEZ.** Connect a verified RFP-021 deposit statement to the wrapped mint, consume its statement ID atomically and test replay rejection. The prototype starts with synthetic wrapped balances.
+- **Ethereum → LEZ.** The [inbound runner](docs/INBOUND.md) connects RFP-021 finalized Sepolia storage proofs to private wrapped minting on LEZ rc3. It checks replay across different finalized headers and supports a Sepolia-only ETH escrow.
 - **Integration and operation.** The grant plan should validate the full round trip on the required testnets and cover recovery, operating procedures and the audit boundary. Our proposed post-delivery role covers running the prover and relaying infrastructure, monitoring checkpoint health, maintaining compatibility with upstream releases and handling incidents. Proof verification follows the public deployment configuration.
 
 [Redemption design](docs/REDEMPTION.md) · [Source and version pins](docs/SOURCES.md) · [License](LICENSE)

@@ -28,12 +28,18 @@ pub enum Message {
         pairing: Hash,
         binding: Hash,
     },
+    Claim(Vec<u8>),
+    Consume([u8; 32]),
 }
 
 pub fn sink() -> Actor {
+    sink_for(TOKEN)
+}
+
+pub fn sink_for(program: AccountId) -> Actor {
     Actor::new(
-        AccountId::for_public_pda(&TOKEN, &PdaSeed::new([0x45; 32])),
-        TOKEN,
+        AccountId::for_public_pda(&program, &PdaSeed::new([0x45; 32])),
+        program,
     )
 }
 
@@ -68,17 +74,24 @@ fn with_state(response: Response, state: &impl BorshSerialize) -> Response {
 
 pub fn handle(input: &ReceiveInput, message: Message) -> Response {
     assert_eq!(input.receiver.program_account_id, TOKEN);
+    handle_wrapped(input, message)
+}
+
+/// Deployed LEZ programs take their identity from the authenticated receiver.
+pub fn handle_wrapped(input: &ReceiveInput, message: Message) -> Response {
+    let program = input.receiver.program_account_id;
+    let sink = sink_for(program);
     if let Message::Append {
         amount,
         pairing,
         binding,
     } = message
     {
-        assert_eq!(input.receiver, sink());
+        assert_eq!(input.receiver, sink);
         assert!(input.from_own_program() && amount > 0 && binding != [0; 32]);
         let mut exits = read_exit_state(&input.pre_state);
         assert_eq!(exits.pairing, pairing, "burn pairing mismatch");
-        let leaf = burn_leaf(TOKEN.as_ref().try_into().unwrap(), amount, binding);
+        let leaf = burn_leaf(program.as_ref().try_into().unwrap(), amount, binding);
         let position = exits.tree.append(leaf).expect("exit tree capacity");
         let event = ProgramEvent {
             selector: EXIT_SELECTOR,
@@ -86,16 +99,17 @@ pub fn handle(input: &ReceiveInput, message: Message) -> Response {
         };
         return with_state(Response::keep_state().event(event), &exits);
     }
-    assert_ne!(input.receiver, sink());
+    assert_ne!(input.receiver, sink);
     let mut balance = read_balance(&input.pre_state);
     let response = match message {
         Message::Transfer { to, amount } => {
             assert!(input.is_authorized && amount > 0);
-            assert_ne!(to, sink().account_id);
+            assert_ne!(to, sink.account_id);
             balance = balance
                 .checked_sub(amount)
                 .expect("insufficient wrapped balance");
-            Response::keep_state().send_sync(Actor::new(to, TOKEN), &Message::Credit { amount })
+            let credit = Message::Credit { amount };
+            Response::keep_state().send_sync(Actor::new(to, program), &credit)
         }
         Message::Credit { amount } => {
             assert!(input.from_own_program() && amount > 0);
@@ -114,7 +128,7 @@ pub fn handle(input: &ReceiveInput, message: Message) -> Response {
                 .checked_sub(amount)
                 .expect("insufficient wrapped balance");
             Response::keep_state().send_sync(
-                sink(),
+                sink,
                 &Message::Append {
                     amount,
                     pairing,
@@ -123,6 +137,7 @@ pub fn handle(input: &ReceiveInput, message: Message) -> Response {
             )
         }
         Message::Append { .. } => unreachable!(),
+        Message::Claim(_) | Message::Consume(_) => panic!("inbound program required"),
     };
     with_state(response, &balance)
 }

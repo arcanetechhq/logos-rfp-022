@@ -6,4 +6,4 @@ publish = false
 
 [dependencies]
 borsh = { version = "1.5.7", features = ["derive"] }
-risc0-zkvm = { version = "=3.1.0", default-features = false, features = ["std"] }
+risc0-zkvm = { version = ">=3.0.5, <3.2", default-features = false, features = ["std"] }

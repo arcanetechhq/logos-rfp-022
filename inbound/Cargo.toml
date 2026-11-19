@@ -1,0 +1,82 @@
+[workspace]
+
+[package]
+name = "redemption-inbound"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autobins = false
+
+[[bin]]
+name = "inbound-actor"
+path = "src/bin/actor.rs"
+required-features = ["guest"]
+
+[[bin]]
+name = "inbound-run"
+path = "src/bin/run.rs"
+required-features = ["runner"]
+
+[features]
+guest = []
+runner = [
+    "dep:alloy-consensus",
+    "dep:alloy-trie",
+    "dep:anyhow",
+    "dep:helios-consensus-core",
+    "dep:lee",
+    "dep:rand",
+    "dep:risc0-binfmt",
+    "dep:risc0-circuit-recursion",
+    "dep:risc0-circuit-rv32im",
+    "dep:risc0-zkp",
+    "dep:risc0-zkvm",
+    "dep:risc0-zkos-v1compat",
+    "lee_core/host",
+]
+
+[dependencies]
+alloy-primitives = { version = "1.6", features = ["tiny-keccak", "serde"] }
+arcane-attestation-actor = { path = "../../logos-rfp-021/lez-actor" }
+arcane-attestation-core = { path = "../../logos-rfp-021/crates/attestation-core" }
+borsh = { version = "1.5", features = ["derive"] }
+lee_core = { git = "https://github.com/logos-blockchain/logos-execution-zone", rev = "bafd07be0701398f9bc435f73ab05e9a7936c301" }
+redemption-core = { path = "../redemption/core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+alloy-consensus = { version = "=2.1.0", optional = true }
+alloy-trie = { version = "0.9.1", features = ["ethereum"], optional = true }
+anyhow = { version = "1", optional = true }
+helios-consensus-core = { git = "https://github.com/a16z/helios", rev = "2922a475ef1b48476983333cbae7fc92fdb46cd6", optional = true }
+lee = { git = "https://github.com/logos-blockchain/logos-execution-zone", rev = "bafd07be0701398f9bc435f73ab05e9a7936c301", optional = true }
+rand = { version = "0.9", optional = true }
+risc0-binfmt = { version = "=3.0.5", optional = true }
+risc0-circuit-recursion = { version = "=4.0.5", default-features = false, optional = true }
+risc0-circuit-rv32im = { version = "=4.0.5", default-features = false, optional = true }
+risc0-zkp = { version = "=3.0.5", default-features = false, optional = true }
+risc0-zkvm = { version = "=3.0.5", default-features = false, features = ["std"], optional = true }
+risc0-zkos-v1compat = { version = "=2.2.2", optional = true }
+
+[dev-dependencies]
+alloy-rlp = "0.3"
+alloy-trie = { version = "0.9.1", features = ["ethereum"] }
+lee_core = { git = "https://github.com/logos-blockchain/logos-execution-zone", rev = "bafd07be0701398f9bc435f73ab05e9a7936c301", features = ["host"] }
+
+[profile.dev]
+debug = 0
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
+[patch.crates-io]
+blst = { git = "https://github.com/risc0/blst", rev = "7d1fc3e6d8cf0d52a291f52455233bf8d6432ed2" }
+bls12_381 = { path = "../../logos-rfp-021/.tools/staged-bls" }
+ethereum_hashing = { git = "https://github.com/ncitron/ethereum_hashing", rev = "7ee70944ed4fabe301551da8c447e4f4ae5e6c35" }
+sha2 = { git = "https://github.com/risc0/RustCrypto-hashes", rev = "c2b5d71c687cbccf9235069732c050486a01b1b2" }
+sha2-v0-10 = { git = "https://github.com/risc0/RustCrypto-hashes", package = "sha2", rev = "244dc3b08788f7a4ccce14c66896ae3b4f24c166" }
+tiny-keccak = { git = "https://github.com/risc0/tiny-keccak", rev = "8fcc866dc94dcec3e79c3b2bc8fbc51b22f2d5e1" }
+
+[patch."https://github.com/a16z/helios"]
+helios-consensus-core = { path = "../../logos-rfp-021/.tools/staged-helios/ethereum/consensus-core" }

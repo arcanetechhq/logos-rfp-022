@@ -1,5 +1,6 @@
 [workspace]
-members = ["core", "methods", "runner"]
+members = ["core", "guest", "methods", "runner"]
+default-members = ["core", "methods", "runner"]
 exclude = ["actor", "burn-methods"]
 resolver = "3"
 

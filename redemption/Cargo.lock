@@ -1615,6 +1615,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "redemption-guest"
+version = "0.1.0"
+dependencies = [
+ "borsh",
+ "redemption-core",
+ "risc0-zkvm",
+]
+
+[[package]]
 name = "redemption-methods"
 version = "0.1.0"
 dependencies = [

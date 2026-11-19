@@ -42,6 +42,13 @@ export RISC0_BUILD_LOCKED=1
 export RISC0_REAL_SERVER_PATH="$WORK/tools/r0vm"
 export RISC0_SERVER_PATH="$HERE/scripts/r0vm-measured.sh" RISC0_METRICS_DIR="$HERE/evidence/prover-resources"
 export RUSTFLAGS='--cap-lints=allow'
+target_dir="$HERE/target"
+# Historical receipts are bound to the original unremapped guest images.
+if [ -z "${REUSE_PROOFS+x}${REUSE_CHECKPOINT+x}" ]; then
+  export RUSTC_WRAPPER="$HERE/scripts/rustc-remap.sh"
+else
+  target_dir="$HERE/target/legacy"
+fi
 # Caps only lints: no validation, proving or verification is disabled.
 if ! "$WORK/tools/rzup" show | rg -q '1\.91\.1'; then "$WORK/tools/rzup" install rust 1.91.1; fi
 "$WORK/tools/rzup" default rust 1.91.1
@@ -49,12 +56,12 @@ rustup toolchain install 1.98.1 --profile minimal
 if [ "${BOOTSTRAP_ONLY:-0}" = 1 ]; then exit 0; fi
 cd "$HERE"
 # The default always produces fresh cryptographic proofs. REUSE_PROOFS=1 is an explicit fast replay.
-cargo +1.98.1 build --locked --bin reverse-settlement-prototype 2>&1 | tee evidence/build.log
-/usr/bin/time "$TIME_FLAG" ./target/debug/reverse-settlement-prototype 2> evidence/settlement-time.log | tee evidence/settlement.log
+cargo +1.98.1 build --locked --target-dir "$target_dir" --bin reverse-settlement-prototype 2>&1 | tee evidence/build.log
+/usr/bin/time "$TIME_FLAG" "$target_dir/debug/reverse-settlement-prototype" 2> evidence/settlement-time.log | tee evidence/settlement.log
 cargo +1.98.1 build --locked --manifest-path native-auth/Cargo.toml 2>&1 | tee evidence/auth-build.log
 /usr/bin/time "$TIME_FLAG" ./native-auth/target/debug/native-auth evidence/accepted-burn-block.borsh > evidence/native-auth.log 2> evidence/native-auth-time.log
 cat evidence/native-auth.log
-cargo +1.98.1 build --locked --features checkpoint --bin checkpoint 2>&1 | tee evidence/checkpoint-build.log
-/usr/bin/time "$TIME_FLAG" ./target/debug/checkpoint 2> evidence/checkpoint-time.log | tee evidence/checkpoint.log
-cargo +1.98.1 test --locked --features checkpoint --bin checkpoint > evidence/gate-tests.log 2>&1
+cargo +1.98.1 build --locked --target-dir "$target_dir" --features checkpoint --bin checkpoint 2>&1 | tee evidence/checkpoint-build.log
+/usr/bin/time "$TIME_FLAG" "$target_dir/debug/checkpoint" 2> evidence/checkpoint-time.log | tee evidence/checkpoint.log
+cargo +1.98.1 test --locked --target-dir "$target_dir" --features checkpoint --bin checkpoint > evidence/gate-tests.log 2>&1
 cat evidence/gate-tests.log

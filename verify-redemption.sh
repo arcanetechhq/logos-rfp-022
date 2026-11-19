@@ -10,6 +10,11 @@ export RISC0_HOME="$WORK/risc0" RISC0_BUILD_LOCKED=1
 export RISC0_DEV_MODE=0 RISC0_PROVER=ipc RISC0_EXECUTOR=ipc
 export RISC0_SERVER_PATH="$WORK/tools/r0vm"
 export RUSTFLAGS=--cap-lints=allow CARGO_TARGET_DIR="$HERE/target"
+if [ "${VERIFY_NATIVE_REDEMPTION:-0}" != 1 ] || [ -z "${REUSE_PROOFS+x}" ]; then
+  export RUSTC_WRAPPER="$HERE/scripts/rustc-remap.sh"
+else
+  export CARGO_TARGET_DIR="$HERE/target/legacy"
+fi
 
 cargo +1.98.1 test --locked --manifest-path redemption/Cargo.toml -p redemption-core
 cargo +1.98.1 test --locked --lib
@@ -34,8 +39,8 @@ if [ "${VERIFY_NATIVE_REDEMPTION:-0}" = 1 ]; then
 fi
 cd "$RUN"
 echo "Verification evidence: $RUN/evidence"
-EXECUTE_ONLY=1 "$HERE/target/debug/redemption-runner"
-"$HERE/target/debug/bridge-exits" | tee evidence/redemption-actor-tests.log
+EXECUTE_ONLY=1 "$CARGO_TARGET_DIR/debug/redemption-runner"
+"$CARGO_TARGET_DIR/debug/bridge-exits" | tee evidence/redemption-actor-tests.log
 
 if [ "${WRAP_GROTH16:-0}" = 1 ] && [ "${LIMIT_WRAP_MEMORY:-0}" = 1 ]; then
   export RFP022_REAL_DOCKER="$(command -v docker)"
@@ -48,7 +53,7 @@ if [ "${VERIFY_NATIVE_V2_PROOF:-0}" = 1 ]; then
     cp "$HERE/evidence/redemption-native-v2-receipt.borsh" evidence/
     PROOF_LOG=redemption-native-v2-reverification
   fi
-  NATIVE_V2_REDEMPTION=1 "$HERE/target/debug/redemption-runner" | tee "evidence/$PROOF_LOG.log"
+  NATIVE_V2_REDEMPTION=1 "$CARGO_TARGET_DIR/debug/redemption-runner" | tee "evidence/$PROOF_LOG.log"
 fi
 
 if [ "${VERIFY_GROTH16:-0}" = 1 ] && [ ! -f evidence/redemption-native-v2-evm-seal.bin ]; then
@@ -63,6 +68,6 @@ if [ "${VERIFY_NATIVE_REDEMPTION:-0}" = 1 ]; then
   if [ -n "${REUSE_REDEMPTION:-}" ]; then
     cp "$HERE/evidence/redemption-native-receipt.borsh" evidence/
   fi
-  NATIVE_REDEMPTION_FIXTURE=1 "$HERE/target/debug/reverse-settlement-prototype" | tee evidence/redemption-native-settlement.log
-  NATIVE_REDEMPTION_FIXTURE=1 "$HERE/target/debug/redemption-runner" | tee evidence/redemption-native-proof.log
+  NATIVE_REDEMPTION_FIXTURE=1 "$CARGO_TARGET_DIR/debug/reverse-settlement-prototype" | tee evidence/redemption-native-settlement.log
+  NATIVE_REDEMPTION_FIXTURE=1 "$CARGO_TARGET_DIR/debug/redemption-runner" | tee evidence/redemption-native-proof.log
 fi

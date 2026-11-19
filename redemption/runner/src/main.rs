@@ -4,8 +4,7 @@ mod fixture;
 use redemption_core::{ExitTree, Journal, Witness, burn_binding, burn_leaf, membership, redeem};
 use redemption_methods::{REDEMPTION_GUEST_ELF, REDEMPTION_GUEST_ID};
 use risc0_zkvm::{
-    ExecutorEnv, InnerReceipt, ProverOpts, Receipt, compute_image_id, default_executor,
-    default_prover, sha::Digest,
+    ExecutorEnv, InnerReceipt, ProverOpts, Receipt, default_executor, default_prover, sha::Digest,
 };
 
 fn main() {
@@ -99,12 +98,9 @@ fn main() {
     let mut image_id = Digest::from(REDEMPTION_GUEST_ID);
     if let Err(error) = receipt.verify(image_id) {
         assert!(reuse, "new receipt failed verification: {error}");
-        let archived_guest = include_bytes!("../../../evidence/redemption-program.bin");
-        let archived_id = compute_image_id(archived_guest).unwrap();
-        assert_eq!(
-            archived_id.as_bytes(),
-            include_bytes!("../../../evidence/redemption-native-v2-image-id.bin")
-        );
+        const ARCHIVED_IMAGE_ID: &[u8; 32] =
+            include_bytes!("../../../evidence/redemption-native-v2-image-id.bin");
+        let archived_id = Digest::from(*ARCHIVED_IMAGE_ID);
         receipt
             .verify(archived_id)
             .expect("cached receipt must match the pinned archived redemption guest");

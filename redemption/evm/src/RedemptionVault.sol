@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {CheckpointContest} from "./CheckpointContest.sol";
+import {DepositNotes} from "./DepositNotes.sol";
 
 /// ABI of the released RISC Zero Ethereum verifier. An invalid proof must revert.
 interface IRiscZeroVerifier {
@@ -218,8 +219,13 @@ contract RedemptionVault is ReentrancyGuard {
             asset.safeTransferFrom(msg.sender, address(this), amount);
             if (asset.balanceOf(address(this)) != balance + amount) revert InvalidDeposit();
         }
+        DepositNotes.record(commitment, amount);
         escrowed += amount;
         emit Deposited(++depositCount, commitment, amount);
+    }
+
+    function depositAmount(bytes32 commitment) external view returns (uint128) {
+        return DepositNotes.amount(commitment);
     }
 
     /// The relayer may submit the proof. The proof fixes every payout argument.

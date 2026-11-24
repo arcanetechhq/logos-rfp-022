@@ -35,10 +35,11 @@ COMMITMENT="$(jq -r .commitment "$RUN/public-note.json")"
 node redemption/evm/sepolia-deposit.cjs deposit "$RUN/evm" "$ESCROW" "$COMMITMENT" > "$RUN/deposit.json"
 ```
 
-Choose a trusted recent finalized Sepolia beacon root whose execution block includes the deposit. Wait for one later finalized header in the same sync-committee period. Use an execution RPC that serves EIP-1186 proofs at both block hashes.
+Choose a trusted recent finalized Sepolia beacon root whose execution block includes the deposit. Wait for one later finalized header in the same sync-committee period. The collector can use a different execution RPC from the depositor. It needs EIP-1186 proofs at both finalized block hashes. On November 24, the ethPandaOps endpoint served both sampled blocks (12,204,544 and 12,204,638). OnFinality and PublicNode rejected the older proof request.
 
 ```sh
 python3 inbound/collect-sepolia.py "$RUN/policy.json" "$CHECKPOINT" \
+  --execution https://rpc.sepolia.ethpandaops.io \
   --deposit "$(jq -r .transaction "$RUN/deposit.json")" --note "$RUN/public-note.json" > "$RUN/inputs.json"
 RISC0_DEV_MODE=0 RISC0_PROVER=ipc RISC0_EXECUTOR=ipc RISC0_SERVER_PATH="$RFP021/.tools/r0vm" \
   "$HOST" run "$TRACKER" "$MINT" "$RUN/policy.json" "$RUN/private-note.json" "$RUN/inputs.json"

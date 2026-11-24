@@ -10,7 +10,10 @@ import urllib.request
 def query(url, payload=None):
     request = urllib.request.Request(
         url, data=None if payload is None else json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "arcane-logos-rfp-022/0.1 (Sepolia proof collector)",
+        },
     )
     with urllib.request.urlopen(request, timeout=20) as response:
         return json.load(response)

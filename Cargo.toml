@@ -49,6 +49,10 @@ name = "checkpoint_cycles"
 path = "src/bin/checkpoint_cycles.rs"
 required-features = ["checkpoint"]
 
+[[bin]]
+name = "block-checkpoint"
+path = "src/bin/block_checkpoint.rs"
+required-features = ["checkpoint"]
 
 [dependencies.redemption-actor]
 path = "redemption/actor"

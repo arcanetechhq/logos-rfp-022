@@ -14,6 +14,30 @@ Output: `Journal { before, after, exit_root, tx_hash, block, timestamp }`. Hashe
 
 The fragment does NOT execute fee reserve/refund, block summary, clock, system upgrades, all program dispatch or Logos consensus in the guest. Full native `apply_block` does execute fee/clock and receipts independently. Its result must not be relabelled as a proof of the whole block.
 
+## From the action proof to a source checkpoint
+
+1. **Bind the action to native block bytes.** The block-link guest verifies the archived action receipt under its pinned image. It recomputes the native LEZ block hash and matches the proved transaction, block number and timestamp to the payload. Its journal binds that result to the exact inscription bytes and the action's `exit_root`. The supported shape has one private user transaction and two trailing public transactions. The included success flag is a claim in the block. The guest only proves the restricted private transition and its inclusion.
+2. **Prove execution of the whole LEZ block.** Reuse native settlement rules in a proving environment, including fee and clock transactions, receipts and ordered application to the state from the preceding verified checkpoint. Verify program execution receipts against the program images resolved from that state. Compare complete state and the exit accumulator with native `apply_block` on successful and reverted transactions. Prove one block before composing successive transitions. Use an authenticated incremental state witness before extrapolating proof costs to production.
+3. **Bind execution to a canonical Logos checkpoint.** Authenticate both the Logos checkpoint and the ordered zone payloads under it. The composed proof must derive the LEZ state and exit root from those payloads and the previous accepted checkpoint. The native checkpoint format and finality rule remain open. An explicitly labelled fixture can exercise the composition until the source network provides an authenticated input.
+4. **Verify on Ethereum.** Keep the local fixture separate from the production vault. Accept a burn on the selected branch, reject a valid burn from the displaced branch, and reject a duplicate payout. Measure proof latency, the age of the checkpoint at payout and Ethereum gas.
+
+The runner reads the archived native block and action receipt from `evidence/`. Run from the repository root.
+
+```sh
+BOOTSTRAP_ONLY=1 ./reproduce.sh
+work="$(cd ../.. && pwd)/work"
+export RISC0_HOME="$work/risc0" RISC0_SERVER_PATH="$work/tools/r0vm"
+export RISC0_EXECUTOR=ipc RISC0_PROVER=ipc RISC0_DEV_MODE=0 RISC0_BUILD_LOCKED=1
+export RUSTC_WRAPPER="$PWD/scripts/rustc-remap.sh" RUSTFLAGS=--cap-lints=allow
+cargo +1.98.1 test --locked --test block_link
+cargo +1.98.1 build --locked --features checkpoint --bin block-checkpoint
+target/debug/block-checkpoint execute
+target/debug/block-checkpoint prove "$work/block-link-receipt.borsh"
+target/debug/block-checkpoint verify "$work/block-link-receipt.borsh"
+```
+
+The local run on 25 November 2026 verified a Composite receipt with dev mode disabled. The link guest used 4,267,896 user cycles. Proving and verifying the new receipt took about 11.6 minutes after the archived action receipt was checked. The receipt is 12,812,510 bytes and includes the action receipt as an assumption. These measurements cover the link guest and its verification, with Groth16 wrapping reserved for the composed checkpoint proof.
+
 ## Required production source-history interface
 
 A permissionless history prover should produce a proof whose public journal commits, at minimum, to:

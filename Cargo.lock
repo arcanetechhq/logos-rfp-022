@@ -5720,6 +5720,7 @@ version = "0.1.0"
 dependencies = [
  "acceptance-core",
  "borsh",
+ "bridge_core",
  "burn-core",
  "chain_state",
  "checkpoint-methods",
@@ -5727,8 +5728,10 @@ dependencies = [
  "common",
  "fee_core",
  "hex",
+ "k256",
  "lee",
  "lee_core",
+ "program_loader_core",
  "programs",
  "redemption-actor",
  "redemption-burn-methods",
@@ -5738,8 +5741,10 @@ dependencies = [
  "risc0-zkvm",
  "serde",
  "serde_json",
+ "settlement-methods",
  "sha2",
  "system_accounts",
+ "system_upgrader_core",
 ]
 
 [[package]]
@@ -6438,6 +6443,13 @@ checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
 dependencies = [
  "base16ct",
  "serde",
+]
+
+[[package]]
+name = "settlement-methods"
+version = "0.1.0"
+dependencies = [
+ "risc0-build",
 ]
 
 [[package]]

@@ -38,6 +38,23 @@ target/debug/block-checkpoint verify "$work/block-link-receipt.borsh"
 
 The local run on 25 November 2026 verified a Composite receipt with dev mode disabled. The link guest used 4,267,896 user cycles. Proving and verifying the new receipt took about 11.6 minutes after the archived action receipt was checked. The receipt is 12,812,510 bytes and includes the action receipt as an assumption. These measurements cover the link guest and its verification, with Groth16 wrapping reserved for the composed checkpoint proof.
 
+## Bounded block settlement
+
+`settlement-guest` verifies a complete non-genesis block of charged native-token transfers between existing public accounts. It recomputes the native transaction and block commitments, checks Schnorr authorization and ordered nonces, and derives fee reserve, charge, refund, distribution, clock tick and receipts. A successful built-in transfer uses zero program cycles. A chargeable transfer failure uses its signed gas limit and advances the sender's nonce without taking the transfer. The fixture exercises both outcomes in one block and rejects a changed receipt, reordered signed transactions and a missing fee invocation.
+
+The witness opens the accounts accessed by execution and carries a digest for each other account. The resulting commitment covers the address-indexed account store and the full native private tree, nullifiers, publications and recovery bindings. Its domain differs from the earlier private-action snapshot digest. The host reconstructs the whole post-state from the witness and checks its native Borsh bytes against `apply_block`. Omitting untouched executable segments from the witness reduced the fixture to about 11.9 million user cycles from 31.9 million with full bytecode.
+
+The proof requires a predecessor state and block hash authenticated elsewhere. It reads the unchanged exit accumulator from that state after two native burns in the fixture. The guest pins the immutable fee and clock images and supports the corresponding distribution, refund and tick paths. It excludes upgrade registries, arbitrary public programs and private transactions. For arbitrary programs, the guest needs metering bound to a verifiable execution trace. A host-supplied RISC Zero cycle counter cannot bind native receipts.
+
+With the preceding RISC Zero environment configured, run:
+
+```sh
+cargo +1.98.1 build --locked --features settlement --bin block-settlement
+target/debug/block-settlement execute
+target/debug/block-settlement prove "$work/settlement-receipt.borsh"
+target/debug/block-settlement verify "$work/settlement-receipt.borsh"
+```
+
 ## Required production source-history interface
 
 A permissionless history prover should produce a proof whose public journal commits, at minimum, to:

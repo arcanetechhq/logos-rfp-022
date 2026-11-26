@@ -34,6 +34,28 @@ debug = 0
 [features]
 bridge = ["dep:redemption-actor", "dep:redemption-burn-methods"]
 checkpoint = ["dep:checkpoint-methods"]
+settlement = ["bridge", "dep:settlement-methods", "dep:bridge_core", "dep:system_upgrader_core", "dep:program_loader_core", "dep:k256"]
+
+[dependencies.settlement-methods]
+path = "settlement-methods"
+optional = true
+
+[dependencies.bridge_core]
+path = "../../work/upstream/lez/lez/programs/bridge/core"
+optional = true
+
+[dependencies.system_upgrader_core]
+path = "../../work/upstream/lez/lez/programs/system_upgrader/core"
+optional = true
+
+[dependencies.program_loader_core]
+path = "../../work/upstream/lez/lee/program_loader"
+optional = true
+
+[dependencies.k256]
+version = "0.13.4"
+features = ["schnorr"]
+optional = true
 
 [dependencies.checkpoint-methods]
 path = "checkpoint-methods"
@@ -53,6 +75,11 @@ required-features = ["checkpoint"]
 name = "block-checkpoint"
 path = "src/bin/block_checkpoint.rs"
 required-features = ["checkpoint"]
+
+[[bin]]
+name = "block-settlement"
+path = "src/bin/block_settlement.rs"
+required-features = ["settlement"]
 
 [dependencies.redemption-actor]
 path = "redemption/actor"

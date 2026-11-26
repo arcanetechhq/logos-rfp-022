@@ -1,0 +1,13 @@
+[package]
+name = "burn-meter"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+anyhow = "1"
+derive_more = { version = "2", features = ["debug"] }
+risc0-binfmt = "=3.0.6"
+risc0-zkvm = { version = "=3.1.0", default-features = false, features = ["std"] }
+tracing = "0.1"

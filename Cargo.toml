@@ -33,6 +33,7 @@ debug = 0
 
 [features]
 bridge = ["dep:redemption-actor", "dep:redemption-burn-methods"]
+burn-meter = ["bridge", "dep:burn-meter"]
 checkpoint = ["dep:checkpoint-methods"]
 settlement = ["bridge", "dep:settlement-methods", "dep:bridge_core", "dep:system_upgrader_core", "dep:program_loader_core", "dep:k256"]
 
@@ -93,3 +94,12 @@ optional = true
 name = "bridge-exits"
 path = "src/bin/bridge_exits.rs"
 required-features = ["bridge"]
+
+[dependencies.burn-meter]
+path = "burn-meter"
+optional = true
+
+[[bin]]
+name = "burn-meter-check"
+path = "src/bin/burn_meter_check.rs"
+required-features = ["burn-meter"]

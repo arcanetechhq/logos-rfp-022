@@ -13,7 +13,9 @@ use logos_blockchain_core::{
     events::Events,
     header::{Header, HeaderId},
     mantle::{
+        OpRef,
         ledger::verification_mode::StandardMode,
+        ops::channel::inscribe::InscriptionOp,
         transactions::{GenesisTx, SignedOps, states::Preverified},
     },
 };
@@ -60,6 +62,8 @@ pub struct SourceReplay {
 pub struct ReplayUpdate {
     pub block_id: HeaderId,
     pub events: Events,
+    /// Mantle inscriptions in validated transaction order, including on provisional forks.
+    pub inscriptions: Vec<InscriptionOp>,
     pub removed_from_selected_branch: Vec<HeaderId>,
     pub added_to_selected_branch: Vec<HeaderId>,
 }
@@ -173,9 +177,18 @@ impl SourceReplay {
             uncle_slots,
         )?;
         let events = self.ledger.commit_update(verified);
+        let inscriptions = block
+            .transactions_iter()
+            .flat_map(SignedOps::op_refs_iter)
+            .filter_map(|op| match op {
+                OpRef::ChannelInscribe(inscription) => Some(inscription.clone()),
+                _ => None,
+            })
+            .collect();
         Ok(ReplayUpdate {
             block_id,
             events,
+            inscriptions,
             removed_from_selected_branch: outcome.reorged_blocks.iter().copied().collect(),
             added_to_selected_branch: outcome.newly_canonical_blocks,
         })

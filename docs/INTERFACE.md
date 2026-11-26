@@ -55,6 +55,37 @@ target/debug/block-settlement prove "$work/settlement-receipt.borsh"
 target/debug/block-settlement verify "$work/settlement-receipt.borsh"
 ```
 
+On 26 November 2026, the mixed block used 11,925,317 user cycles. The CPU run generated and verified a 3,644,782-byte Composite receipt in 30 minutes and 17 seconds with dev mode disabled. The follow-up block used 433,497 user cycles and produced a 281,914-byte Composite receipt that verified independently.
+
+## Chained settlement and local Logos replay
+
+The composition guest verifies two receipts for the pinned settlement image. It requires the second block to extend the first by block hash, state digest and height under the same pairing. The composed journal commits to both exact payload digests in execution order and to the resulting exit root. In the fixture, the second block advances the clock and distributes the smoothed payout without user transactions.
+
+The native Logos fixture publishes those two payloads in consecutive Mantle inscriptions on one branch. A competing branch carries the archived private burn block. The native replay checks header signatures, block bodies, leadership proofs, transaction proofs and the channel state on each branch. After fork choice displaces the earlier branch, the fixture checks both payloads against the selected channel's message chain. The host checks that exact order against the composed proof.
+
+The composition guest used 30,544 user cycles. The verified Composite receipt is 4,148,012 bytes and includes both settlement receipts. The outer proving and verification took about 22 seconds after checking the input receipts. Swapping the two replay payloads fails the binding check with the same valid Composite receipt.
+
+Use the same environment as above to reproduce the local composition:
+
+```sh
+run="$work/block-settlement"
+mkdir -p "$run"
+cargo +1.98.1 build --locked --features settlement --bin block-settlement
+target/debug/block-settlement payload "$run/selected-payload.borsh"
+target/debug/block-settlement next-payload "$run/next-payload.borsh"
+target/debug/block-settlement prove "$run/receipt.borsh"
+target/debug/block-settlement next-prove "$run/next-receipt.borsh"
+target/debug/block-settlement chain-prove "$run/receipt.borsh" "$run/next-receipt.borsh" "$run/chain-receipt.borsh"
+RFP022_SETTLEMENT_PAYLOAD="$run/selected-payload.borsh" \
+RFP022_SETTLEMENT_NEXT_PAYLOAD="$run/next-payload.borsh" \
+RFP022_REPLAY_FIXTURE="$run/replay.json" \
+  cargo +1.98.1 test --locked --manifest-path native-auth/Cargo.toml \
+  exports_selected_lez_payloads -- --ignored --nocapture
+target/debug/block-settlement bind-fixture "$run/chain-receipt.borsh" "$run/replay.json" "$run/evm-checkpoint.json"
+```
+
+Here the predecessor and replay output are local fixture inputs. Production needs an authenticated predecessor, a specified bridge-verifiable Logos finality rule and a proof that connects the accepted Mantle history to those exact LEZ payloads.
+
 ## Required production source-history interface
 
 A permissionless history prover should produce a proof whose public journal commits, at minimum, to:

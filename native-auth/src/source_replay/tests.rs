@@ -53,7 +53,7 @@ fn validates_native_history_and_keeps_branch_changes_provisional() {
     let observation_slot = 2_000u64.into();
 
     let leader = Ed25519Key::from_bytes(&[11; 32]);
-    let (tx, message) = inscription(&leader, &fee_key, fee_note);
+    let (tx, message) = inscription(&leader, &fee_key, fee_note, MsgId::root(), LEZ_PAYLOAD);
     let first_block = build_block(&replay, genesis_id, stake, &stake_key, &leader, vec![tx]);
     let first = first_block.header().id();
     let first_slot = first_block.header().slot();
@@ -234,6 +234,120 @@ fn validates_native_history_and_keeps_branch_changes_provisional() {
     );
 }
 
+#[test]
+#[ignore = "takes the proved LEZ block from the settlement fixture"]
+fn exports_selected_lez_payloads_from_competing_native_histories() {
+    let input = std::env::var_os("RFP022_SETTLEMENT_PAYLOAD").expect("settlement payload path");
+    let next_input = std::env::var_os("RFP022_SETTLEMENT_NEXT_PAYLOAD").expect("next payload path");
+    let output = std::env::var_os("RFP022_REPLAY_FIXTURE").expect("replay output path");
+    let selected_payload = std::fs::read(input).unwrap();
+    let next_payload = std::fs::read(next_input).unwrap();
+    assert_ne!(selected_payload, LEZ_PAYLOAD);
+    assert_ne!(next_payload, selected_payload);
+    let stake_key = ZkKey::new(Fr::from(1u64));
+    let fee_key = ZkKey::new(Fr::from(2u64));
+    let genesis = make_genesis(&stake_key, &fee_key);
+    let genesis_id = Header::genesis(&genesis).id();
+    let stake = genesis.transfer().operation().utxo_by_index(0).unwrap();
+    let fee_note = genesis.transfer().operation().utxo_by_index(1).unwrap();
+    let mut replay = SourceReplay::from_genesis(genesis_id, genesis, fixture_eras()).unwrap();
+    let observation_slot = 2_000u64.into();
+
+    let leader = Ed25519Key::from_bytes(&[11; 32]);
+    let (tx, losing_message) = inscription(&leader, &fee_key, fee_note, MsgId::root(), LEZ_PAYLOAD);
+    let losing_block = build_block(&replay, genesis_id, stake, &stake_key, &leader, vec![tx]);
+    let displaced_slot = u64::from(losing_block.header().slot());
+    let losing = replay.apply(losing_block, observation_slot).unwrap();
+    assert_eq!(losing.added_to_selected_branch, [losing.block_id]);
+    assert_eq!(losing.inscriptions.len(), 1);
+    assert_eq!(losing.inscriptions[0].id(), losing_message);
+
+    let other_leader = Ed25519Key::from_bytes(&[12; 32]);
+    let (tx, selected_message) = inscription(
+        &other_leader,
+        &fee_key,
+        fee_note,
+        MsgId::root(),
+        &selected_payload,
+    );
+    let next_fee_note = tx
+        .op_refs_iter()
+        .find_map(|op| match op {
+            logos_blockchain_core::mantle::OpRef::Transfer(transfer) => transfer.utxo_by_index(0),
+            _ => None,
+        })
+        .unwrap();
+    let selected_block = build_block(
+        &replay,
+        genesis_id,
+        stake,
+        &stake_key,
+        &other_leader,
+        vec![tx],
+    );
+    let selected = replay.apply(selected_block, observation_slot).unwrap();
+    assert_eq!(selected.inscriptions.len(), 1);
+    assert_eq!(selected.inscriptions[0].id(), selected_message);
+    let (tx, next_message) = inscription(
+        &other_leader,
+        &fee_key,
+        next_fee_note,
+        selected_message,
+        &next_payload,
+    );
+    let child = build_block(
+        &replay,
+        selected.block_id,
+        stake,
+        &stake_key,
+        &other_leader,
+        vec![tx],
+    );
+    let selected_tip = child.header().id();
+    let slot = u64::from(child.header().slot());
+    let chosen = replay.apply(child, observation_slot).unwrap();
+    assert_eq!(chosen.removed_from_selected_branch, [losing.block_id]);
+    assert_eq!(replay.selected_tip(), selected_tip);
+    assert_eq!(replay.consensus.lib(), genesis_id);
+    let selected_state = replay.ledger.state(&selected_tip).unwrap();
+    let channel = selected_state
+        .mantle_ledger()
+        .channels()
+        .channel_state(&ChannelId::from(CHANNEL))
+        .unwrap();
+    assert_eq!(channel.tip_message, next_message);
+    let selected_op = &selected.inscriptions[0];
+    assert_eq!(chosen.inscriptions.len(), 1);
+    let next_op = &chosen.inscriptions[0];
+    assert_eq!(next_op.channel_id, ChannelId::from(CHANNEL));
+    assert_eq!(next_op.parent, selected_op.id());
+    assert_eq!(next_op.id(), next_message);
+    assert_eq!(&next_op.inscription[..], next_payload);
+    let displaced_op = &losing.inscriptions[0];
+    assert_eq!(selected_op.channel_id, ChannelId::from(CHANNEL));
+    assert_eq!(&selected_op.inscription[..], selected_payload);
+    assert_eq!(&displaced_op.inscription[..], LEZ_PAYLOAD);
+    let record = serde_json::json!({
+        "genesis": hex::encode(genesis_id.as_ref()),
+        "channel": hex::encode(CHANNEL),
+        "selected_tip": hex::encode(selected_tip.as_ref()),
+        "slot": slot,
+        "selected_message": hex::encode(next_message.as_ref()),
+        "selected_payloads": [
+            hex::encode(&selected_op.inscription[..]),
+            hex::encode(&next_op.inscription[..]),
+        ],
+        "displaced_payload": hex::encode(&displaced_op.inscription[..]),
+        "displaced_tip": hex::encode(losing.block_id.as_ref()),
+        "displaced_message": hex::encode(losing_message.as_ref()),
+        "displaced_slot": displaced_slot,
+    });
+    std::fs::write(output, serde_json::to_vec_pretty(&record).unwrap()).unwrap();
+    println!(
+        "PASS ordered Logos inscriptions match the selected Mantle history and displaced bytes remain provisional"
+    );
+}
+
 fn make_genesis(stake: &ZkKey, fees: &ZkKey) -> GenesisTx {
     let parameters = GenesisParameters {
         chain_id: "rfp022-replay-fixture".to_owned().try_into().unwrap(),
@@ -264,17 +378,22 @@ fn inscription(
     key: &Ed25519Key,
     fee_key: &ZkKey,
     fee_note: Utxo,
+    parent: MsgId,
+    payload: &[u8],
 ) -> (SignedOps<Preverified, StandardMode>, MsgId) {
     let op = InscriptionOp {
         channel_id: ChannelId::from(CHANNEL),
-        inscription: Inscription::try_new(LEZ_PAYLOAD.to_owned(), 1_000_000).unwrap(),
-        parent: MsgId::root(),
+        inscription: Inscription::try_new(payload.to_owned(), 1_000_000).unwrap(),
+        parent,
         signer: key.public_key().into_unverified(),
     };
     let message = op.id();
     let spend = TransferOp::new(
         Inputs::try_new(vec![fee_note.id()]).unwrap(),
-        Outputs::new([Note::new(999_000_000, fee_key.to_public_key())]),
+        Outputs::new([Note::new(
+            fee_note.note.value.checked_sub(1_000_000).unwrap(),
+            fee_key.to_public_key(),
+        )]),
     );
     let ops = Ops::new(FORK, [Op::Transfer(spend), Op::ChannelInscribe(op)]);
     let hash = ops.hash();

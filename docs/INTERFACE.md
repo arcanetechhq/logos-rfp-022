@@ -76,7 +76,7 @@ target/debug/burn-block prove "$run/burn-block-receipt.borsh"
 target/debug/burn-block verify "$run/burn-block-receipt.borsh"
 ```
 
-The scoped guest execution used 34,562,494 user cycles. The program and its metering rules are pinned. Production still requires an authenticated predecessor and a proof of publication in finalized Logos history.
+The scoped guest execution used 34,562,494 user cycles. The CPU run generated and checked a 10,397,014-byte Composite receipt in 1 hour, 52 minutes and 44 seconds. A separate invocation verified it with dev mode disabled. The program and its metering rules are pinned. Production still requires an authenticated predecessor and a proof of publication in finalized Logos history.
 
 ## Chained settlement and local Logos replay
 

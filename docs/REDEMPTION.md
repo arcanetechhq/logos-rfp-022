@@ -26,6 +26,20 @@ The Ganache fixture pins the expected source checkpoint digest and delegates use
 
 The local run on 26 November 2026 used **373,518 gas** for the release with its Groth16 verification and **79,567 gas** to admit the fixture checkpoint. The release was mined two local blocks after the checkpoint.
 
+### Release from a proved Burn block
+
+First generate the [metered Burn block receipt](INTERFACE.md#metered-wrapped-burn-inside-a-block) and use `verify-redemption.sh` to prepare the local EVM dependencies if needed. Configure the prover environment above and build the withdrawal guest:
+
+```sh
+export CARGO_TARGET_DIR="$PWD/target"
+cargo +1.98.1 build --locked --manifest-path redemption/Cargo.toml -p redemption-runner
+bash redemption/evm/test/burn-block.sh "$run/burn-block-receipt.borsh" "$run"
+```
+
+The runner verifies the Burn block receipt before writing the fixture checkpoint. Its exit root comes from the proved post-state, which started with an empty tree. The EVM test verifies a real Groth16 seal for membership in this root. It rejects that seal's payout while only the empty root is authorized, pays the recipient and relayer after authorizing the proved root, and mines a reverting duplicate. The checkpoint digest uses the same local fixture verifier as above. Use an empty run directory to regenerate the withdrawal seal, with the Docker options above if needed.
+
+The proved Burn root took **79,567 gas** to authorize in the fixture. The vault released 39 units to the recipient and 1 to the relayer two local blocks later. The release used **373,578 gas**, including Groth16 verification. The duplicate reverted without changing either balance.
+
 ## State and claims
 
 1. The LEZ actor debits the holder and synchronously appends a leaf. The exit PDA's initialized pairing and native program ownership are checked at the append. Invalid appends and overspends revert the debit. The public PDA stores a 32-level frontier, count and root in constant space. The append event contains the position and leaf so any wallet can reconstruct paths. The local exit index checks order and commits a batch only if replay matches the root read from applied LEZ state.

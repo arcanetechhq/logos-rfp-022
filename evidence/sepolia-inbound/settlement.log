@@ -1,0 +1,6 @@
+Sepolia finality and deposit verified at 0xc43381b7b9a14797ad8950cfc05de4fc737981686bcac954db5b4b4c4f049e84 and 0xfdb1cd1592fd445b1b76b24b835b260c05bcb6a39167dda7ad7cde0814a87807
+
+thread 'main' (1) panicked at src/bin/actor.rs:9:60:
+E004 duplicate or no new finalised consensus state
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+PASS private_mint=0x8f851b57c2ea69862e826658637084c82c8610ea7e793c5b700df79ce944f9f8 wrapped_wei=1000 cycles=211365 same_tx_rejected=true fresh_claim_rejected=true state_unchanged=true

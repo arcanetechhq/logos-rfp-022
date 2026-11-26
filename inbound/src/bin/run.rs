@@ -309,6 +309,14 @@ fn prove_mint(
         keccak256(borsh::to_vec(state)?) == before,
         "replay changed LEZ state"
     );
+    if let Some(path) = std::env::var_os("RFP022_MINT_TX_OUT") {
+        use std::io::Write;
+        OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)?
+            .write_all(&bytes)?;
+    }
     println!(
         "PASS private_mint={} wrapped_wei={amount} cycles={} same_tx_rejected=true fresh_claim_rejected=true state_unchanged=true",
         B256::from(tx.hash()),
@@ -320,6 +328,24 @@ fn prove_mint(
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     match args.as_slice() {
+        [command, transaction] if command == "verify-mint-proof" => {
+            let tx = PrivacyPreservingTransaction::from_bytes(&fs::read(transaction)?)?;
+            tx.check_stateless()?;
+            let inner: InnerReceipt =
+                borsh::from_slice(&tx.witness_set().proof().clone().into_inner())?;
+            ensure!(
+                matches!(inner, InnerReceipt::Succinct(_)),
+                "expected a succinct receipt"
+            );
+            ensure!(
+                tx.message.execution.public_root.is_none(),
+                "expected private root"
+            );
+            let journal =
+                lee_core::to_borsh_frame(&(&tx.message.public_context, &tx.message.execution));
+            risc0_zkvm::Receipt::new(inner, journal).verify(lee::PRIVACY_PRESERVING_CIRCUIT_ID)?;
+            println!("PASS private transaction proof {}", B256::from(tx.hash()));
+        }
         [command, tracker, escrow] if command == "policy" => {
             let policy = Policy {
                 escrow: escrow.parse()?,
@@ -372,7 +398,7 @@ fn main() -> Result<()> {
             run(tracker, mint, read(policy)?, read(note)?, read(inputs)?)?;
         }
         _ => bail!(
-            "usage: inbound-run policy tracker.elf escrow | note mint.elf policy.json private-note.json | attest tracker.elf policy.json finality.json | run tracker.elf mint.elf policy.json private-note.json inputs.json"
+            "usage: inbound-run policy tracker.elf escrow | note mint.elf policy.json private-note.json | attest tracker.elf policy.json finality.json | run tracker.elf mint.elf policy.json private-note.json inputs.json | verify-mint-proof transaction.borsh"
         ),
     }
     Ok(())

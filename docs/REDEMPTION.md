@@ -14,6 +14,18 @@ The v2 receipt also verified on the local EVM after wrapping to a 260-byte Groth
 
 After `BOOTSTRAP_ONLY=1 ./reproduce.sh`, run `RUSTFLAGS=--cap-lints=allow cargo +1.98.1 test --locked --manifest-path native-auth/Cargo.toml --lib` to check Logos source replay with native leadership proofs, a real LEZ block inscription on a fixture chain, and competing valid branches.
 
+### Local release from the selected history
+
+Run the [chained settlement and local Logos replay](INTERFACE.md#chained-settlement-and-local-logos-replay) to get `evm-checkpoint.json`. Then run this from the repository root:
+
+```sh
+RFP022_EVM_CHECKPOINT="$run/evm-checkpoint.json" VERIFY_GROTH16=1 ./verify-redemption.sh
+```
+
+The Ganache fixture pins the expected source checkpoint digest and delegates user proof verification to the released Groth16 verifier. It runs the real vault constructor at the address committed in the archived redemption proof. The test rejects the displaced checkpoint and checks that a valid user proof cannot spend a root absent from the authorized history. With the selected root authorized, a funded vault pays the proof's recipient and relayer. A mined duplicate reverts and leaves both balances intact. This harness measures gas for the genuine user proof and payout. The source checkpoint is a fixture input, so its gas and the interval to payout describe the local harness.
+
+The local run on 26 November 2026 used **373,518 gas** for the release with its Groth16 verification and **79,567 gas** to admit the fixture checkpoint. The release was mined two local blocks after the checkpoint.
+
 ## State and claims
 
 1. The LEZ actor debits the holder and synchronously appends a leaf. The exit PDA's initialized pairing and native program ownership are checked at the append. Invalid appends and overspends revert the debit. The public PDA stores a 32-level frontier, count and root in constant space. The append event contains the position and leaf so any wallet can reconstruct paths. The local exit index checks order and commits a batch only if replay matches the root read from applied LEZ state.

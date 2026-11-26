@@ -70,7 +70,34 @@ const input = {
           return state.close(expected);
         }
       }`
-    }
+    },
+    "test/FixtureCheckpointVerifier.sol": {
+      content: `
+      // SPDX-License-Identifier: MIT
+      pragma solidity 0.8.30;
+      import "../src/RedemptionVault.sol";
+      // Local test only. The replay fixture supplies exactly one trusted checkpoint digest.
+      contract FixtureCheckpointVerifier {
+        error UnselectedFixtureCheckpoint();
+        IRiscZeroVerifier private immutable official;
+        bytes32 private immutable fixtureImage;
+        bytes32 private immutable fixtureDigest;
+
+        constructor(IRiscZeroVerifier verifier, bytes32 image, bytes32 digest) {
+          official = verifier;
+          fixtureImage = image;
+          fixtureDigest = digest;
+        }
+
+        function verify(bytes calldata seal, bytes32 imageId, bytes32 digest) external view {
+          if (imageId == fixtureImage) {
+            if (digest != fixtureDigest || seal.length != 0) revert UnselectedFixtureCheckpoint();
+          } else {
+            official.verify(seal, imageId, digest);
+          }
+        }
+      }`
+    },
   },
   settings: {
     optimizer: { enabled: true, runs: 200 },
@@ -155,6 +182,79 @@ async function contestLifecycle(chain, probe, other) {
     selector("InvalidObservationTime()"));
   await (await probe.open(candidate, await time(), period)).wait();
   console.log("PASS contest timing, late replacement, stale calls, hold result and fresh next round");
+}
+
+async function releaseWithFixtureCheckpoint({ chain, provider, signer, deploy, verifier, seal, imageId, journal }) {
+  const checkpoint = JSON.parse(fs.readFileSync(process.env.RFP022_EVM_CHECKPOINT, "utf8"));
+  const { pairing, previous, next, exitRoot, displacedRoot, slot } = checkpoint;
+  const { displacedCheckpoint, displacedSlot } = checkpoint;
+  const address = repeated(4, 20);
+  const digest = (candidate, root, candidateSlot) => ethers.sha256(ethers.AbiCoder.defaultAbiCoder().encode(
+    ["bytes32", "bytes32", "bytes32", "bytes32", "uint64"],
+    [pairing, previous, candidate, root, candidateSlot],
+  ));
+  const fixtureImage = ethers.id("RFP022 local source checkpoint fixture");
+  const vaultCode = compiled.contracts["src/RedemptionVault.sol"].RedemptionVault;
+  const vaultFactory = new ethers.ContractFactory(vaultCode.abi, vaultCode.evm.bytecode.object, signer);
+  const config = [repeated(1, 32), repeated(2, 32), repeated(0x44, 32), ethers.ZeroAddress, [40],
+    ethers.ZeroHash, 0];
+  const setCode = code => chain.request({ method: "evm_setAccountCode", params: [address, code] });
+
+  async function vaultFor(candidate, root, candidateSlot) {
+    const source = await deploy("test/FixtureCheckpointVerifier.sol", "FixtureCheckpointVerifier",
+      [await verifier.getAddress(), fixtureImage, digest(candidate, root, candidateSlot)]);
+    const init = await vaultFactory.getDeployTransaction(
+      await source.getAddress(), fixtureImage, imageId, previous, ...config,
+    );
+    // The archived real proof commits to this vault address. Run the actual constructor
+    // at that address on Ganache and install the runtime it returns.
+    await setCode(init.data);
+    const runtime = await provider.call({ to: address, data: "0x" });
+    assert.equal((await (await signer.sendTransaction({ to: address, gasLimit: 3_000_000 })).wait()).status, 1);
+    await setCode(runtime);
+    const vault = vaultFactory.attach(address);
+    assert.equal(await vault.pairingId(), pairing);
+    assert.equal(await vault.checkpoint(), previous);
+    assert.equal(await vault.denomination(40), true);
+    return vault;
+  }
+
+  assert.equal(ethers.hexlify(journal.subarray(0, 32)), pairing);
+  assert.equal(ethers.hexlify(journal.subarray(32, 64)), exitRoot);
+  const nullifier = ethers.hexlify(journal.subarray(64, 96));
+  const snapshot = await chain.request({ method: "evm_snapshot", params: [] });
+  const alternative = await vaultFor(displacedCheckpoint, displacedRoot, displacedSlot);
+  await (await alternative.advanceCheckpoint(displacedCheckpoint, displacedRoot, displacedSlot, "0x")).wait();
+  await (await alternative.deposit(repeated(0xaa, 32), 40, { value: 40 })).wait();
+  await expectRevert(() => alternative.release.staticCall(journal, seal), selector("UnknownExitRoot()"));
+  assert.equal(await alternative.spent(nullifier), false);
+  assert.equal(await alternative.escrowed(), 40n);
+  assert.equal(await chain.request({ method: "evm_revert", params: [snapshot] }), true);
+
+  const vault = await vaultFor(next, exitRoot, slot);
+  await expectRevert(() => vault.advanceCheckpoint.staticCall(displacedCheckpoint, displacedRoot, displacedSlot, "0x"),
+    selector("UnselectedFixtureCheckpoint()"));
+  assert.equal(await vault.checkpoint(), previous);
+  const advance = await (await vault.advanceCheckpoint(next, exitRoot, slot, "0x")).wait();
+  assert.equal(await vault.authenticatedRoots(exitRoot), true);
+  assert.equal(await vault.authenticatedRoots(displacedRoot), false);
+  await (await vault.deposit(repeated(0xaa, 32), 40, { value: 40 })).wait();
+  const release = await (await vault.release(journal, seal)).wait();
+  const balance = account => chain.request({ method: "eth_getBalance", params: [account, "latest"] });
+  assert.equal(BigInt(await balance(repeated(6, 20))), 39n);
+  assert.equal(BigInt(await balance(repeated(7, 20))), 1n);
+  assert.equal(await vault.escrowed(), 0n);
+  assert.equal(await vault.spent(nullifier), true);
+  await expectRevert(() => vault.release.staticCall(journal, seal), selector("AlreadyRedeemed()"));
+  await assert.rejects(async () => {
+    const duplicate = await vault.release(journal, seal, { gasLimit: 750_000 });
+    await duplicate.wait();
+  }, error => error.receipt?.status === 0);
+  assert.equal(BigInt(await balance(repeated(6, 20))), 39n);
+  assert.equal(BigInt(await balance(repeated(7, 20))), 1n);
+  console.log("PASS local checkpoint selects the payout root and rejects the displaced root and duplicate payout");
+  const elapsedBlocks = release.blockNumber - advance.blockNumber;
+  console.log(`Fixture checkpoint gas=${advance.gasUsed} genuine Groth16 release gas=${release.gasUsed} local blocks to payout=${elapsedBlocks}`);
 }
 
 async function main() {
@@ -276,6 +376,9 @@ async function main() {
       });
       const verified = await sent.wait();
       assert.equal(verified.status, 1);
+      if (process.env.RFP022_EVM_CHECKPOINT) {
+        await releaseWithFixtureCheckpoint({ chain, provider, signer, deploy, verifier, seal, imageId, journal });
+      }
       journal[64] ^= 1;
       await expectRevert(() => verifier.verify.staticCall(seal, imageId, ethers.sha256(journal)));
       await expectRevert(() => verifier.verify.staticCall(seal, ethers.ZeroHash, digest));

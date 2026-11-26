@@ -15,6 +15,10 @@ system_upgrader_core = { path = "../../../work/upstream/lez/lez/programs/system_
 program_loader_core = { path = "../../../work/upstream/lez/lee/program_loader" }
 k256 = { version = "0.13.4", features = ["schnorr"] }
 redemption-actor = { path = "../redemption/actor" }
+burn-meter = { path = "../burn-meter", optional = true }
+
+[features]
+metered-burn = ["dep:burn-meter"]
 
 [[bin]]
 name = "block-settlement-guest"

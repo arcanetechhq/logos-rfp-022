@@ -740,6 +740,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87a0cf66fd1eb2fb7b822cb78370d82303750809bc6ba855f3f58e517d3238db"
 
 [[package]]
+name = "burn-block-methods"
+version = "0.1.0"
+dependencies = [
+ "risc0-build",
+]
+
+[[package]]
 name = "burn-core"
 version = "0.1.0"
 dependencies = [
@@ -5731,7 +5738,7 @@ version = "0.1.0"
 dependencies = [
  "acceptance-core",
  "borsh",
- "bridge_core",
+ "burn-block-methods",
  "burn-core",
  "burn-meter",
  "chain_state",
@@ -5753,10 +5760,10 @@ dependencies = [
  "risc0-zkvm",
  "serde",
  "serde_json",
+ "settlement-guest",
  "settlement-methods",
  "sha2",
  "system_accounts",
- "system_upgrader_core",
 ]
 
 [[package]]
@@ -6455,6 +6462,24 @@ checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
 dependencies = [
  "base16ct",
  "serde",
+]
+
+[[package]]
+name = "settlement-guest"
+version = "0.1.0"
+dependencies = [
+ "acceptance-core",
+ "borsh",
+ "bridge_core",
+ "burn-meter",
+ "clock_core",
+ "fee_core",
+ "k256",
+ "lee_core",
+ "program_loader_core",
+ "redemption-actor",
+ "risc0-zkvm",
+ "system_upgrader_core",
 ]
 
 [[package]]

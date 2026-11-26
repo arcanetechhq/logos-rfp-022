@@ -1,4 +1,4 @@
-//! Settlement for already-admitted public native transfers at the pinned LEZ revision.
+//! Settlement of restricted public transactions at the pinned LEZ revision.
 use acceptance_core::{Evidence, Fee, State, Tx, hash};
 use borsh::{BorshDeserialize, BorshSerialize};
 use fee_core::{
@@ -18,6 +18,9 @@ use lee_core::{
 };
 use program_loader_core::LoaderActorState;
 use std::collections::BTreeMap;
+
+#[cfg(feature = "metered-burn")]
+pub mod burn;
 
 const BLOCK_DOMAIN: &[u8; 32] = b"/LEE/v0.3/Message/Block/\x00\x00\x00\x00\x00\x00\x00\x00";
 
@@ -125,6 +128,17 @@ pub fn snapshot_digest(
 /// Concealed accounts are committed by address and digest and never accessed or updated.
 /// This commitment covers the full native state but has a different domain from the action proof.
 pub fn apply(input: &Input) -> (Vec<u8>, Journal) {
+    apply_inner(
+        input,
+        #[cfg(feature = "metered-burn")]
+        None,
+    )
+}
+
+fn apply_inner(
+    input: &Input,
+    #[cfg(feature = "metered-burn")] meter: Option<&burn_meter::Image>,
+) -> (Vec<u8>, Journal) {
     let mut state: State = borsh::from_slice(&input.before).expect("native state");
     assert_eq!(borsh::to_vec(&state).unwrap(), input.before);
     let before = snapshot_digest(&state, &input.concealed_accounts);
@@ -203,7 +217,16 @@ pub fn apply(input: &Input) -> (Vec<u8>, Journal) {
     assert_eq!(transactions.len(), block.receipts.len());
     let mut summary = BlockFeeSummary::default();
     for (tx, listed) in transactions.iter().zip(&block.receipts) {
-        let actual = settle(tx, &mut state, inbox, &fee_state, &restricted, &mut summary);
+        let actual = settle(
+            tx,
+            &mut state,
+            inbox,
+            &fee_state,
+            &restricted,
+            &mut summary,
+            #[cfg(feature = "metered-burn")]
+            meter,
+        );
         assert_eq!(
             borsh::to_vec(&actual).unwrap(),
             borsh::to_vec(listed).unwrap()
@@ -295,6 +318,15 @@ pub fn apply(input: &Input) -> (Vec<u8>, Journal) {
     (after, journal)
 }
 
+enum Action {
+    Transfer {
+        to: AccountId,
+        amount: Balance,
+    },
+    #[cfg(feature = "metered-burn")]
+    Burn,
+}
+
 fn settle(
     tx: &Transaction,
     state: &mut State,
@@ -302,32 +334,50 @@ fn settle(
     opening: &FeeState,
     restricted: &[AccountId],
     summary: &mut BlockFeeSummary,
+    #[cfg(feature = "metered-burn")] meter: Option<&burn_meter::Image>,
 ) -> TransactionReceipt {
     let Transaction::Public(public) = tx else {
-        panic!("public native transfer required")
+        panic!("public transaction required")
     };
-    let fee = public.fee.as_ref().expect("charged transfer");
+    let fee = public.fee.as_ref().expect("charged transaction");
     let sender = fee.payer;
-    let sender_actor = Actor::native_balance(sender);
-    assert_eq!(public.root.to, sender_actor);
-    let native_token::Message::Transfer { to, amount } =
-        borsh::from_slice(&public.root.message).expect("native transfer")
-    else {
-        panic!("native transfer required");
+    let sender_actor = public.root.to;
+    assert_eq!(sender_actor.account_id, sender);
+    let action = match sender_actor.program_account_id {
+        NATIVE_TOKEN_PROGRAM_ID => {
+            let native_token::Message::Transfer { to, amount } =
+                borsh::from_slice(&public.root.message).expect("native transfer")
+            else {
+                panic!("native transfer required");
+            };
+            Action::Transfer { to, amount }
+        }
+        #[cfg(feature = "metered-burn")]
+        redemption_actor::TOKEN if meter.is_some() => {
+            burn::check_program(state);
+            let redemption_actor::Message::Burn { .. } =
+                borsh::from_slice(&public.root.message).expect("wrapped burn")
+            else {
+                panic!("wrapped burn required");
+            };
+            Action::Burn
+        }
+        _ => panic!("unsupported charged actor"),
     };
-    assert_ne!(sender, to);
-    assert!(!restricted.contains(&sender) && !restricted.contains(&to));
-    assert!(state.accounts.contains_key(&to));
+    let other = match action {
+        Action::Transfer { to, .. } => Actor::native_balance(to),
+        #[cfg(feature = "metered-burn")]
+        Action::Burn => redemption_actor::sink(),
+    };
+    assert_ne!(sender, other.account_id);
+    assert!(!restricted.contains(&sender) && !restricted.contains(&other.account_id));
+    assert!(state.accounts.contains_key(&other.account_id));
     assert!(public.admission_evidence.is_empty());
     assert_eq!(
         public.nonces,
         BTreeMap::from([(sender, state.accounts[&sender].nonce)])
     );
-    check_context(
-        &public.public_context,
-        [sender_actor, Actor::native_balance(to)],
-        [sender],
-    );
+    check_context(&public.public_context, [sender_actor, other], [sender]);
     let [(signature, key)] = public.signatures.as_slice() else {
         panic!("one signer required")
     };
@@ -350,7 +400,7 @@ fn settle(
             &hash(&message),
             &schnorr::Signature::try_from(signature.as_slice()).unwrap(),
         )
-        .expect("native transfer signature");
+        .expect("public transaction signature");
 
     let gas_stor = borsh::object_length(tx).unwrap().try_into().unwrap();
     let view = FeeTxView::Public {
@@ -363,13 +413,17 @@ fn settle(
     validate_static_tx(&view, opening).expect("fee declaration");
     let reserved = fee_reserve(&view, opening);
     transfer(state, sender, inbox, reserved).expect("fee reserve");
-    let success = match transfer(state, sender, to, amount) {
-        Ok(()) => true,
-        Err(
-            native_token::TransferError::InsufficientBalance { .. }
-            | native_token::TransferError::BalanceOverflow { .. },
-        ) => false,
-        Err(err) => panic!("invalid native balance: {err}"),
+    let cycles = match action {
+        Action::Transfer { to, amount } => match transfer(state, sender, to, amount) {
+            Ok(()) => Some(0),
+            Err(
+                native_token::TransferError::InsufficientBalance { .. }
+                | native_token::TransferError::BalanceOverflow { .. },
+            ) => None,
+            Err(err) => panic!("invalid native balance: {err}"),
+        },
+        #[cfg(feature = "metered-burn")]
+        Action::Burn => burn::execute(state, &public.root, meter.unwrap(), fee.gas_limit),
     };
     state
         .accounts
@@ -377,9 +431,8 @@ fn settle(
         .unwrap()
         .nonce
         .public_account_nonce_increment();
-    // The built-in token executes with no guest cycles. A native transfer failure
-    // is a charged revert at the signed gas limit (ValidatedStateDiff).
-    let gas_exec = if success { 0 } else { fee.gas_limit };
+    let success = cycles.is_some();
+    let gas_exec = cycles.unwrap_or(fee.gas_limit).min(fee.gas_limit);
     let fee_base = fee_actual_base(gas_exec, &view, opening);
     let tip = u128::from(fee.tip);
     let refund = reserved

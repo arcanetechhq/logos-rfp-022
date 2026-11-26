@@ -4,23 +4,21 @@ mod fixture;
 mod fixture_checkpoint;
 #[path = "../lez_blocks.rs"]
 mod lez_blocks;
+#[path = "../settlement_fixture.rs"]
+mod settlement_fixture;
+use settlement_fixture::{check_native_block, rehash, sign};
 
-use acceptance_core::State;
-use common::{
-    block::{Block, HashableBlockData},
-    transaction::LeeTransaction,
+use fixture_checkpoint::composition::{
+    ARCHIVED_SETTLEMENT_IMAGE, ChainedJournal, SETTLEMENT_IMAGE, join,
 };
-use fixture_checkpoint::composition::{ChainedJournal, SETTLEMENT_IMAGE, join};
-use lee::{FeeDeclaration, PrivateKey, PublicKey, PublicTransaction, V03State, public_transaction};
+use lee::{PrivateKey, PublicKey};
 use lee_core::{
-    account::{AccountId, Actor, Nonce},
+    account::{AccountId, Actor},
     native_token,
-    program::PROGRAM_LOADER_ACCOUNT_ID,
 };
-use program_loader_core::{LoaderActorState, ProgramSegment};
 use redemption_actor::{ExitState, TOKEN, read_exit_state, sink};
 use reverse_settlement_prototype::block_settlement::{
-    CLOCK_IMAGE, FEE_IMAGE, Input, Journal, account_digest, apply, snapshot_digest,
+    CLOCK_IMAGE, FEE_IMAGE, Input, Journal, apply,
 };
 use risc0_zkvm::{
     ExecutorEnv, InnerReceipt, ProverOpts, Receipt, default_executor, default_prover,
@@ -29,54 +27,14 @@ use settlement_methods::{
     BLOCK_SETTLEMENT_GUEST_ELF, BLOCK_SETTLEMENT_GUEST_ID, SETTLEMENT_CHAIN_GUEST_ELF,
     SETTLEMENT_CHAIN_GUEST_ID,
 };
-use std::{borrow::Cow, collections::BTreeMap, fs, path::PathBuf, time::Instant};
+use std::{borrow::Cow, fs, path::PathBuf, time::Instant};
+
+const ARCHIVED_CHAIN_IMAGE: [u32; 8] = [
+    1373997337, 3472372327, 4173525209, 3298753985, 2558222010, 2884747113, 1079465393, 1759553085,
+];
 
 const GAS_LIMIT: u64 = 10_000_000;
 const PRODUCER: AccountId = AccountId::new([0x79; 32]);
-
-fn sign(
-    key: &PrivateKey,
-    sender: AccountId,
-    nonce: Nonce,
-    to: Actor,
-    actors: [Actor; 2],
-    call: impl borsh::BorshSerialize,
-) -> LeeTransaction {
-    let message = public_transaction::Message::try_new_with_fees(
-        to,
-        actors,
-        BTreeMap::from([(sender, nonce)]),
-        call,
-        FeeDeclaration::new(sender, GAS_LIMIT, 17, 1_000_000_000),
-    )
-    .unwrap();
-    // A stable local fixture lets a separate invocation reproduce the proof input.
-    let signature = k256::schnorr::SigningKey::from_bytes(key.value())
-        .unwrap()
-        .sign_prehash_with_aux_rand(&message.hash(), &[0; 32])
-        .unwrap();
-    let witnesses = public_transaction::WitnessSet::from_raw_parts(vec![(
-        lee::Signature {
-            value: signature.to_bytes(),
-        },
-        PublicKey::new_from_private_key(key),
-    )]);
-    LeeTransaction::Public(PublicTransaction::new(message, witnesses))
-}
-
-fn rehash(block: Block) -> Vec<u8> {
-    borsh::to_vec(
-        &HashableBlockData {
-            block_id: block.header.block_id,
-            prev_block_hash: block.header.prev_block_hash,
-            timestamp: block.header.timestamp,
-            transactions: block.body.transactions,
-            receipts: block.body.receipts,
-        }
-        .into_pending_block(),
-    )
-    .unwrap()
-}
 
 fn native_fixture() -> [(Input, Journal); 2] {
     assert_eq!(FEE_IMAGE, programs::fee().id());
@@ -121,6 +79,7 @@ fn native_fixture() -> [(Input, Journal); 2] {
                 pairing,
                 binding,
             },
+            GAS_LIMIT,
         );
         let block = lez_blocks::build_block(&state, tip.as_ref(), vec![burn]);
         lez_blocks::accept(&mut state, &mut tip, &block).unwrap();
@@ -160,6 +119,7 @@ fn native_fixture() -> [(Input, Journal); 2] {
                 to: PRODUCER,
                 amount,
             },
+            GAS_LIMIT,
         );
         nonce.public_account_nonce_increment();
         tx
@@ -173,7 +133,8 @@ fn native_fixture() -> [(Input, Journal); 2] {
     assert_eq!(reverted.fee.gas_exec, GAS_LIMIT);
     assert!(success.fee.refund > 0);
     assert_eq!(reverted.fee.refund, 0);
-    let (input, journal) = check_native_block(&mut state, &mut tip, &block);
+    let (input, journal) =
+        check_native_block(&mut state, &mut tip, &block, std::convert::identity, apply);
     assert_eq!(state.get_account_by_id(sender).nonce, nonce);
     assert_eq!(journal.exit_root, exit.tree.root());
     assert_eq!(journal.pairing, pairing);
@@ -197,55 +158,17 @@ fn native_fixture() -> [(Input, Journal); 2] {
         "PASS native apply_block parity, success and charged revert, forged receipt, wrong nonce, missing fee tail"
     );
     let followup = lez_blocks::build_block(&state, tip.as_ref(), vec![]);
-    let (next_input, next_journal) = check_native_block(&mut state, &mut tip, &followup);
+    let (next_input, next_journal) = check_native_block(
+        &mut state,
+        &mut tip,
+        &followup,
+        std::convert::identity,
+        apply,
+    );
     assert_eq!(next_journal.before, journal.after);
     assert_eq!(next_journal.parent_hash, journal.block_hash);
     assert_eq!(next_journal.exit_root, journal.exit_root);
     [(input, journal), (next_input, next_journal)]
-}
-
-fn check_native_block(
-    state: &mut V03State,
-    tip: &mut Option<chain_state::Tip>,
-    block: &Block,
-) -> (Input, Journal) {
-    let mut visible: State = borsh::from_slice(&borsh::to_vec(state).unwrap()).unwrap();
-    let expected_before = snapshot_digest(&visible, &BTreeMap::new());
-    let mut concealed = BTreeMap::new();
-    visible.accounts.retain(|id, account| {
-        if ProgramSegment::from_loader_actor_state(
-            account.data.actor_state(PROGRAM_LOADER_ACCOUNT_ID),
-        )
-        .is_some()
-        {
-            concealed.insert(*id, account.clone());
-            false
-        } else {
-            true
-        }
-    });
-    assert!(!concealed.is_empty());
-    let input = Input {
-        before: borsh::to_vec(&visible).unwrap(),
-        concealed_accounts: concealed
-            .iter()
-            .map(|(id, account)| (*id, account_digest(account)))
-            .collect(),
-        block: borsh::to_vec(block).unwrap(),
-    };
-    lez_blocks::accept(state, tip, block).unwrap();
-    let (after, journal) = apply(&input);
-    let mut after: State = borsh::from_slice(&after).unwrap();
-    for (id, account) in concealed {
-        assert!(after.accounts.insert(id, account).is_none());
-    }
-    assert!(
-        borsh::to_vec(&after).unwrap() == borsh::to_vec(state).unwrap(),
-        "complete native state differs"
-    );
-    assert_eq!(journal.before, expected_before);
-    assert_eq!(journal.after, snapshot_digest(&after, &BTreeMap::new()));
-    (input, journal)
 }
 
 fn rejects(input: &Input, block: Vec<u8>, reason: &str) {
@@ -281,15 +204,18 @@ fn main() {
             .build()
             .unwrap()
     };
-    let verify = |receipt: &Receipt, expected: &Journal| -> Journal {
+    let verify = |receipt: &Receipt, expected: &Journal| {
         assert!(!matches!(receipt.inner, InnerReceipt::Fake(_)));
-        receipt.verify(BLOCK_SETTLEMENT_GUEST_ID).unwrap();
+        let image = [SETTLEMENT_IMAGE, ARCHIVED_SETTLEMENT_IMAGE]
+            .into_iter()
+            .find(|image| receipt.verify(*image).is_ok())
+            .expect("settlement receipt for an approved image");
         let journal: Journal = borsh::from_slice(&receipt.journal.bytes).unwrap();
         assert_eq!(&journal, expected);
         let mut edited = receipt.clone();
         edited.journal.bytes[0] ^= 1;
-        assert!(edited.verify(BLOCK_SETTLEMENT_GUEST_ID).is_err());
-        journal
+        assert!(edited.verify(image).is_err());
+        (image, journal)
     };
     if !matches!(mode, "bind-fixture" | "chain-execute" | "chain-prove") {
         assert!(trailing.is_empty());
@@ -347,15 +273,17 @@ fn main() {
             };
             let first_receipt = read_receipt(&output.expect("first settlement receipt"));
             let next_receipt = read_receipt(next_path);
-            let first = verify(&first_receipt, &first_journal);
-            let next = verify(&next_receipt, &next_journal);
+            let (first_image, first) = verify(&first_receipt, &first_journal);
+            let (next_image, next) = verify(&next_receipt, &next_journal);
             let expected = join(&first, &next).unwrap();
             assert!(join(&next, &first).is_none());
             let mut unrelated = next.clone();
             unrelated.before[0] ^= 1;
             assert!(join(&first, &unrelated).is_none());
             let env = ExecutorEnv::builder()
-                .write_slice(&lee_core::to_frame(&borsh::to_vec(&[first, next]).unwrap()))
+                .write_slice(&lee_core::to_frame(
+                    &borsh::to_vec(&([first_image, next_image], [first, next])).unwrap(),
+                ))
                 .add_assumption(first_receipt)
                 .add_assumption(next_receipt)
                 .build()
@@ -417,7 +345,10 @@ fn read_receipt(path: &std::path::Path) -> Receipt {
 
 fn verify_chain(receipt: &Receipt, expected: &ChainedJournal) -> ChainedJournal {
     assert!(!matches!(receipt.inner, InnerReceipt::Fake(_)));
-    receipt.verify(SETTLEMENT_CHAIN_GUEST_ID).unwrap();
+    receipt
+        .verify(SETTLEMENT_CHAIN_GUEST_ID)
+        .or_else(|_| receipt.verify(ARCHIVED_CHAIN_IMAGE))
+        .unwrap();
     assert!(receipt.verify(SETTLEMENT_IMAGE).is_err());
     let journal: ChainedJournal = borsh::from_slice(&receipt.journal.bytes).unwrap();
     assert_eq!(&journal, expected);

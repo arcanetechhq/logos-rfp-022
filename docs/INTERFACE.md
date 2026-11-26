@@ -57,6 +57,27 @@ target/debug/block-settlement verify "$work/settlement-receipt.borsh"
 
 On 26 November 2026, the mixed block used 11,925,317 user cycles. The CPU run generated and verified a 3,644,782-byte Composite receipt in 30 minutes and 17 seconds with dev mode disabled. The follow-up block used 433,497 user cycles and produced a 281,914-byte Composite receipt that verified independently.
 
+### Metered wrapped burn inside a block
+
+The separate `burn-block` image settles the existing wrapped-burn program under its immutable LEZ loader image ID. It authenticates the original actor and kernel memory, replays their RV32IM instructions, and counts the same user cycles and syscall costs that LEZ bills. The supported syscall paths use the LEZ executor's empty guest environment and framed input. Unread random bytes are tracked as unknown, and attempting to read one invalidates the witness. The interpreter rejects instructions and calls outside its supported execution model.
+
+The fixture starts at an empty exit tree. Two signed transactions in the same non-genesis block burn 40 wrapped units and then attempt to burn 61 from the remaining 60. The successful debit and append consume **120,120 user cycles**, with base fee **965,304** and refund **7,039,040**. The overspend consumes its full **1,000,000-cycle** signed budget, with base fee **8,004,344** and zero refund. Both advance the owner's nonce. The guest checks both native receipts, the closing fee distribution and clock tick, and derives the new exit root. The entire reconstructed state matches `apply_block` byte for byte. An additional differential case checks that a mispaired append rolls back the staged debit and keeps the fee. Altering the metering result in a rehashed block or substituting the actor memory is rejected.
+
+With the RISC Zero environment above, run:
+
+```sh
+run="$work/burn-block"
+mkdir -p "$run"
+cargo +1.98.1 build --locked --features burn-block --bin burn-block --bin burn-meter-check
+target/debug/burn-meter-check "$run/burn-image.bin"
+target/debug/burn-block check
+target/debug/burn-block execute
+target/debug/burn-block prove "$run/burn-block-receipt.borsh"
+target/debug/burn-block verify "$run/burn-block-receipt.borsh"
+```
+
+The scoped guest execution used 34,562,494 user cycles. The program and its metering rules are pinned. Production still requires an authenticated predecessor and a proof of publication in finalized Logos history.
+
 ## Chained settlement and local Logos replay
 
 The composition guest verifies two receipts for the pinned settlement image. It requires the second block to extend the first by block hash, state digest and height under the same pairing. The composed journal commits to both exact payload digests in execution order and to the resulting exit root. In the fixture, the second block advances the clock and distributes the smoothed payout without user transactions.

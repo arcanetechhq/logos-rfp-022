@@ -35,18 +35,19 @@ debug = 0
 bridge = ["dep:redemption-actor", "dep:redemption-burn-methods"]
 burn-meter = ["bridge", "dep:burn-meter"]
 checkpoint = ["dep:checkpoint-methods"]
-settlement = ["bridge", "dep:settlement-methods", "dep:bridge_core", "dep:system_upgrader_core", "dep:program_loader_core", "dep:k256"]
+settlement = ["bridge", "dep:settlement-methods", "dep:settlement-guest", "dep:program_loader_core", "dep:k256"]
+burn-block = ["settlement", "burn-meter", "settlement-guest/metered-burn", "dep:burn-block-methods"]
 
 [dependencies.settlement-methods]
 path = "settlement-methods"
 optional = true
 
-[dependencies.bridge_core]
-path = "../../work/upstream/lez/lez/programs/bridge/core"
+[dependencies.settlement-guest]
+path = "settlement-guest"
 optional = true
 
-[dependencies.system_upgrader_core]
-path = "../../work/upstream/lez/lez/programs/system_upgrader/core"
+[dependencies.burn-block-methods]
+path = "burn-block-methods"
 optional = true
 
 [dependencies.program_loader_core]
@@ -90,16 +91,21 @@ optional = true
 path = "redemption/burn-methods"
 optional = true
 
-[[bin]]
-name = "bridge-exits"
-path = "src/bin/bridge_exits.rs"
-required-features = ["bridge"]
-
 [dependencies.burn-meter]
 path = "burn-meter"
 optional = true
 
 [[bin]]
+name = "bridge-exits"
+path = "src/bin/bridge_exits.rs"
+required-features = ["bridge"]
+
+[[bin]]
 name = "burn-meter-check"
 path = "src/bin/burn_meter_check.rs"
 required-features = ["burn-meter"]
+
+[[bin]]
+name = "burn-block"
+path = "src/bin/burn_block.rs"
+required-features = ["burn-block"]

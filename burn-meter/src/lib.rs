@@ -79,8 +79,10 @@ impl Image {
     }
 
     pub fn execute(&self, input: &[u8], limit: u64) -> Result<Outcome> {
+        let memory = Memory::from_image(self);
         let mut machine = Machine {
-            memory: self.clone(),
+            memory,
+            registers: std::array::from_fn(|i| self.word(MACHINE_REGS + i as u32 * 4)),
             mode: self.word(SUSPEND_MODE),
             pc: ByteAddr(self.word(SUSPEND_PC)),
             cycles: 0,
@@ -115,14 +117,51 @@ impl Image {
             .get(&(address / PAGE_BYTES))
             .map_or(0, |page| page[((address % PAGE_BYTES) / 4) as usize])
     }
+}
 
-    #[inline]
-    fn store(&mut self, address: u32, value: u32) {
-        let page = self
-            .0
-            .entry(address / PAGE_BYTES)
-            .or_insert_with(|| Box::new([0; 256]));
-        page[((address % PAGE_BYTES) / 4) as usize] = value;
+type Page = [u32; 256];
+type Bank = [Option<Box<Page>>; 256];
+
+// Array-indexed two-level page table. The pinned actor uses a few small
+// address ranges so the inner machine need not materialize a 4 GiB buffer.
+struct Memory {
+    banks: Vec<Option<Box<Bank>>>,
+}
+
+impl Memory {
+    fn from_image(image: &Image) -> Self {
+        let mut memory = Self {
+            banks: vec![None; 1 << 14],
+        };
+        for (&index, page) in &image.0 {
+            let bank = memory.bank(index);
+            bank[(index & 255) as usize] = Some(page.clone());
+        }
+        memory
+    }
+
+    #[inline(always)]
+    fn bank(&mut self, index: u32) -> &mut Bank {
+        self.banks[(index >> 8) as usize]
+            .get_or_insert_with(|| Box::new(std::array::from_fn(|_| None)))
+    }
+
+    #[inline(always)]
+    fn word(&self, addr: u32) -> u32 {
+        let Some(bank) = &self.banks[(addr >> 18) as usize] else {
+            return 0;
+        };
+        let Some(page) = &bank[((addr >> 10) & 255) as usize] else {
+            return 0;
+        };
+        page[((addr >> 2) & 255) as usize]
+    }
+
+    #[inline(always)]
+    fn store(&mut self, addr: u32, word: u32) {
+        let bank = self.bank(addr >> 10);
+        let page = bank[((addr >> 10) & 255) as usize].get_or_insert_with(|| Box::new([0; 256]));
+        page[((addr >> 2) & 255) as usize] = word;
     }
 }
 
@@ -139,7 +178,8 @@ enum Exit {
 }
 
 struct Machine<'a> {
-    memory: Image,
+    memory: Memory,
+    registers: [u32; 64],
     mode: u32,
     pc: ByteAddr,
     cycles: u64,
@@ -151,15 +191,12 @@ struct Machine<'a> {
 }
 
 impl Machine<'_> {
-    fn reg_base(&self) -> u32 {
-        if self.mode == 0 {
-            USER_REGS
-        } else {
-            MACHINE_REGS
-        }
+    #[inline(always)]
+    fn reg_index(&self, index: usize) -> usize {
+        index + if self.mode == 0 { 32 } else { 0 }
     }
 
-    #[inline]
+    #[inline(always)]
     fn read_word(&self, addr: u32) -> Result<u32> {
         let word = addr & !3;
         ensure!(
@@ -167,13 +204,24 @@ impl Machine<'_> {
             "read uninitialized random word {word:#x} at PC {:#x}",
             self.pc.0
         );
+        let index = (word.wrapping_sub(MACHINE_REGS) >> 2) as usize;
+        if index < self.registers.len() {
+            return Ok(self.registers[index]);
+        }
         Ok(self.memory.word(word))
     }
 
-    #[inline]
+    #[inline(always)]
     fn write_word(&mut self, addr: u32, value: u32) {
-        self.random_words.remove(&addr);
-        self.memory.store(addr, value);
+        if !self.random_words.is_empty() {
+            self.random_words.remove(&addr);
+        }
+        let index = (addr.wrapping_sub(MACHINE_REGS) >> 2) as usize;
+        if index < self.registers.len() {
+            self.registers[index] = value;
+        } else {
+            self.memory.store(addr, value);
+        }
     }
 
     fn byte(&self, addr: u32) -> Result<u8> {
@@ -247,7 +295,10 @@ impl Machine<'_> {
                         Vec::new()
                     }
                     "risc0_zkvm_platform::syscall::nr::SYS_RANDOM" => {
-                        ensure!(addr & 3 == 0 && len & 3 == 0, "unaligned randomness");
+                        ensure!(
+                            addr & 3 == 0 && len & 3 == 0 && addr + len <= MACHINE_REGS,
+                            "unaligned randomness"
+                        );
                         random = true;
                         self.syscall_return = [0; 8];
                         self.syscall_return[..4].copy_from_slice(&len.to_le_bytes());
@@ -409,49 +460,64 @@ impl EmuContext for Machine<'_> {
         bail!("unsupported actor trap at {:#x}: {exception:?}", self.pc.0);
     }
 
+    #[inline(always)]
     fn on_insn_decoded(&mut self, _: InsnKind, _: &DecodedInstruction) -> Result<()> {
         Ok(())
     }
 
+    #[inline(always)]
     fn on_normal_end(&mut self, _: InsnKind) -> Result<()> {
         self.cycles += 1;
         Ok(())
     }
 
+    #[inline(always)]
     fn get_pc(&self) -> ByteAddr {
         self.pc
     }
+    #[inline(always)]
     fn set_pc(&mut self, addr: ByteAddr) {
         self.pc = addr;
     }
 
+    #[inline(always)]
     fn load_register(&mut self, idx: usize) -> Result<u32> {
         if idx == 0 {
             return Ok(0);
         }
-        self.read_word(self.reg_base() + 4 * idx as u32)
+        Ok(self.registers[self.reg_index(idx)])
     }
 
+    #[inline(always)]
     fn store_register(&mut self, idx: usize, value: u32) -> Result<()> {
-        let store_index = if idx == 0 { 64 } else { idx as u32 };
-        self.write_word(self.reg_base() + 4 * store_index, value);
+        let index = self.reg_index(idx);
+        if idx == 0 {
+            self.write_word(MACHINE_REGS + 4 * index as u32 + 256, value);
+        } else {
+            self.registers[index] = value;
+        }
         Ok(())
     }
 
+    #[inline(always)]
     fn load_memory(&mut self, addr: WordAddr) -> Result<u32> {
         self.read_word(addr.baddr().0)
     }
+    #[inline(always)]
     fn store_memory(&mut self, addr: WordAddr, value: u32) -> Result<()> {
         self.write_word(addr.baddr().0, value);
         Ok(())
     }
 
+    #[inline(always)]
     fn check_insn_load(&self, addr: ByteAddr) -> bool {
         self.check_data_load(addr) && addr.0 & 3 == 0
     }
+    #[inline(always)]
     fn check_data_load(&self, addr: ByteAddr) -> bool {
         addr.0 >= LOW && (self.mode != 0 || addr.0 < KERNEL)
     }
+    #[inline(always)]
     fn check_data_store(&self, addr: ByteAddr) -> bool {
         self.check_data_load(addr)
     }

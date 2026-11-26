@@ -1,8 +1,11 @@
 use super::Journal;
 use borsh::{BorshDeserialize, BorshSerialize};
 
-// Independent verifier pin for both inner receipts.
+// Independent verifier pins for current and archived transfer settlement.
 pub const SETTLEMENT_IMAGE: [u32; 8] = [
+    1986472089, 3097709940, 2462758874, 3356233220, 1182519034, 2384855035, 2319619896, 639065794,
+];
+pub const ARCHIVED_SETTLEMENT_IMAGE: [u32; 8] = [
     722521674, 3113861519, 4014836451, 668905204, 2062045237, 4057429489, 2149499369, 1914569824,
 ];
 

@@ -417,6 +417,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "burn-meter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "derive_more",
+ "risc0-binfmt",
+ "risc0-zkvm",
+ "tracing",
+]
+
+[[package]]
 name = "bytemuck"
 version = "1.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2077,6 +2088,7 @@ dependencies = [
  "acceptance-core",
  "borsh",
  "bridge_core",
+ "burn-meter",
  "clock_core",
  "fee_core",
  "k256",

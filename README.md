@@ -1,18 +1,22 @@
 # Logos RFP-022 proof of building
 
-This repository contains an outbound redemption prototype for the LEZ wrapped-asset bridge. The prototype verifies a real Groth16 redemption proof with the released RISC Zero verifier in a local EVM. Its vault requires an independently authenticated Logos checkpoint before it can accept deposits or release funds.
+This repository contains the inbound and outbound prototypes for the LEZ wrapped-asset bridge. A real Sepolia deposit was attested with RFP-021 and minted privately on a standalone LEZ validator. In a separate local run, a proved Burn in a LEZ block funded a withdrawal through the released RISC Zero Groth16 verifier. The local withdrawal authorizes its exit root through a fixture checkpoint. Public withdrawals need a checkpoint authenticated against canonical Logos history.
+
+[Review the evidence and rerun verification](docs/PROOF-OF-BUILDING.md) · [Download the proof bundle](https://github.com/arcanetechhq/logos-rfp-022/releases/tag/proof-of-building-2026-11-28)
 
 ## What we built
 
 | Component | Verified behavior |
 | --- | --- |
+| Sepolia deposit to private mint | RFP-021 authenticated a real Sepolia ETH deposit. A standalone LEZ v0.4-rc3 validator accepted the private mint. It rejected exact replay and a fresh claim for the same deposit under a later finalized header. [Deposit and evidence](docs/INBOUND.md#verified) |
+| Proved Burn block to EVM withdrawal | A separate proof checks a successful public Burn, a reverted overspend, fee accounting and the complete post-state against native `apply_block`. The local vault paid out against the resulting root and rejected a duplicate claim. [Block proof](docs/INTERFACE.md#metered-wrapped-burn-inside-a-block) · [EVM withdrawal](docs/REDEMPTION.md#release-from-a-proved-burn-block) |
 | LEZ burn and exit accumulator | Two public fixture burns execute through native LEZ `apply_block`, debit the wrapped balance and append commitments. Replaying the accepted events reproduces the stored root. Overspend, wrong pairing and unauthorized append leave the balance and root intact. [Test output](evidence/redemption-actor-tests.log) |
 | Private LEZ execution | A separate fixture executes a private burn with a real native PPE proof. The historical checkpoint guest proves a restricted private action and checks its resulting state against native execution. [Settlement](evidence/redemption-native-settlement.log) · [Proof boundary](docs/INTERFACE.md#what-the-fragment-verifies) |
 | Private redemption statement | The RISC Zero guest proves membership in the exit root reconstructed from the two applied public burns. The proof binds the asset and payout to the selected pairing and produces a replay nullifier. The leaf position, membership path and secret stay private. [Receipt generation](evidence/redemption-native-v2-generation.log) |
 | Ethereum verification | The RISC Zero v3.1.0 Ethereum verifier accepts the 260-byte Groth16 seal. Calling that verifier directly used 251,671 gas. Changed journals and image IDs fail. The seal cannot advance a source checkpoint or release funds while source history is unavailable. [Verification result](evidence/redemption-evm-result.json) |
 | Logos source history | Host replay checks native block signatures, transaction execution and genuine Proof of Leadership on two fixture branches. The competing branch displaces the inscription carrying the LEZ burn. A separate EVM test exercises the deadline, replacement and stale-call rules for a permissionless checkpoint contest. [Logos regression test](native-auth/src/source_replay/tests.rs) · [Contest proof interface](docs/REDEMPTION.md#contest-proof-interface) |
 
-Fixture keys, genesis balances and chain histories are synthetic. The proofs and their verification are cryptographic. The gas figure covers a direct call to the proof verifier.
+The outbound fixture uses synthetic keys, genesis balances and source history. The Sepolia deposit is a public testnet transaction. The 251,671 gas figure covers a direct call to the proof verifier for the earlier redemption fixture.
 
 ## Reproduce the checks
 

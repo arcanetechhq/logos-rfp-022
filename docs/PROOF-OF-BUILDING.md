@@ -13,7 +13,7 @@ The outbound run uses a fixture checkpoint to authorize the proved exit root. Th
 
 Use the [release](https://github.com/arcanetechhq/logos-rfp-022/releases/tag/proof-of-building-2026-11-28) source revision and the checkout layout in the [README](../README.md#reproduce-the-checks). The commands below run from the RFP-022 repository root. Verification of the saved proofs uses no wallet keys or Docker.
 
-For the outbound proof, download and extract `burn-block-evidence.tar.gz` to an empty directory. Set `run` to that directory's absolute path. The checksums cover the receipt, the withdrawal seal and journal, the expected fixture checkpoint and the logs. The harness derives the checkpoint from the verified receipt and compares the proved exit root with the withdrawal journal before testing the vault.
+For the outbound proof, download and extract `burn-block-evidence.tar.gz` to an empty directory. Set `run` to that directory's absolute path. The checksums cover the receipt, the original guest images, the withdrawal seal and journal, the expected fixture checkpoint and the logs. The verifier authenticates both original guest images against pinned image IDs so the saved proof can be checked even when a rebuild produces different IDs. The harness derives the checkpoint from the verified receipt and compares the proved exit root with the withdrawal journal before testing the vault.
 
 ```sh
 (cd "$run" && shasum -a 256 -c SHA256SUMS)
@@ -24,7 +24,8 @@ export RISC0_EXECUTOR=ipc RISC0_PROVER=ipc RISC0_DEV_MODE=0 RISC0_BUILD_LOCKED=1
 export RUSTC_WRAPPER="$PWD/scripts/rustc-remap.sh" RUSTFLAGS=--cap-lints=allow
 export CARGO_TARGET_DIR="$PWD/target"
 cargo +1.98.1 build --locked --features burn-block --bin burn-block
-bash redemption/evm/test/burn-block.sh "$run/burn-block-receipt.borsh" "$run"
+RFP022_BURN_IMAGE_DIR="$run" \
+  bash redemption/evm/test/burn-block.sh "$run/burn-block-receipt.borsh" "$run"
 ```
 
 For the saved inbound proof, use the sibling [RFP-021 checkout at `18eea80`](https://github.com/arcanetechhq/logos-rfp-021/tree/18eea809d7f96291898edded2628babe7b2a9537). The offline check verifies the archived private transaction proof. The settlement log records the native balance and replay checks from the original run. [Full inbound procedure](INBOUND.md)

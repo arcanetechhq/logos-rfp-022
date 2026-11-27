@@ -18,7 +18,8 @@ use reverse_settlement_prototype::block_settlement::{
     burn::{ACTOR_IMAGE, Input, apply},
 };
 use risc0_zkvm::{
-    ExecutorEnv, InnerReceipt, ProverOpts, Receipt, default_executor, default_prover,
+    ExecutorEnv, InnerReceipt, ProverOpts, Receipt, compute_image_id, default_executor,
+    default_prover, sha::Digest,
 };
 use settlement_fixture::{check_native_block, rehash, sign};
 use std::{
@@ -29,9 +30,21 @@ use std::{
 };
 
 const GAS_LIMIT: u64 = 1_000_000;
+const ARCHIVED_BLOCK_IMAGE_ID: [u32; 8] = [
+    3173970553, 320068255, 2012124452, 668148501, 18181077, 849327300, 386926491, 194172344,
+];
 
-fn native_fixture(check_rollback: bool) -> (Input, Journal, Hash) {
-    assert_eq!(ACTOR_IMAGE, REDEMPTION_BURN_GUEST_ID);
+fn archived_image(directory: &Path, name: &str, image_id: [u32; 8]) -> Vec<u8> {
+    let image = fs::read(directory.join(name)).unwrap();
+    assert_eq!(
+        compute_image_id(&image).unwrap(),
+        Digest::from(image_id),
+        "unexpected image ID for {name}"
+    );
+    image
+}
+
+fn native_fixture(actor_elf: Cow<'static, [u8]>, check_rollback: bool) -> (Input, Journal, Hash) {
     let key = PrivateKey::try_new([0x0a; 32]).unwrap();
     let owner = AccountId::from(&PublicKey::new_from_private_key(&key));
     let owner_actor = Actor::new(owner, TOKEN);
@@ -39,7 +52,8 @@ fn native_fixture(check_rollback: bool) -> (Input, Journal, Hash) {
     let pairing = instance.id();
     let binding = burn_binding(pairing, &payout, secret).unwrap();
     let initial_tree = ExitTree::default();
-    let program = Program::new(Cow::Borrowed(REDEMPTION_BURN_GUEST_ELF)).unwrap();
+    let actor_memory = Image::from_binary(&actor_elf).unwrap().encode();
+    let program = Program::new(actor_elf).unwrap();
     let mut state = lez_blocks::seeded_state(
         TOKEN,
         program,
@@ -58,9 +72,6 @@ fn native_fixture(check_rollback: bool) -> (Input, Journal, Hash) {
     let genesis = lez_blocks::build_block(&state, None, vec![]);
     lez_blocks::accept(&mut state, &mut tip, &genesis).unwrap();
     let mut nonce = state.get_account_by_id(owner).nonce;
-    let actor_memory = Image::from_binary(REDEMPTION_BURN_GUEST_ELF)
-        .unwrap()
-        .encode();
     if check_rollback {
         // The debit handler stages a balance write. The mispaired append then
         // panics in the second delivery, so neither actor write may survive.
@@ -186,16 +197,16 @@ fn check_invalid(mut input: Input) {
     println!("PASS rejected rehashed false gas receipt and substituted actor memory");
 }
 
-fn verify(receipt: &Receipt, expected: &Journal) {
+fn verify(receipt: &Receipt, expected: &Journal, block_image_id: [u32; 8]) {
     assert!(!matches!(receipt.inner, InnerReceipt::Fake(_)));
-    receipt.verify(BURN_BLOCK_GUEST_ID).unwrap();
+    receipt.verify(block_image_id).unwrap();
     assert_eq!(
         borsh::from_slice::<Journal>(&receipt.journal.bytes).unwrap(),
         *expected
     );
     let mut changed = receipt.clone();
     changed.journal.bytes[160] ^= 1; // pairing
-    assert!(changed.verify(BURN_BLOCK_GUEST_ID).is_err());
+    assert!(changed.verify(block_image_id).is_err());
 }
 
 fn snapshot(directory: &Path, journal: &Journal, leaf: Hash) {
@@ -243,7 +254,27 @@ fn main() {
         .next()
         .expect("use check, execute, prove, verify, native-snapshot or fixture");
     let paths: Vec<_> = args.map(PathBuf::from).collect();
-    let (input, expected, leaf) = native_fixture(mode == "check");
+    let (actor_elf, block_elf, block_image_id) =
+        if let Some(directory) = std::env::var_os("RFP022_BURN_IMAGE_DIR") {
+            let directory = Path::new(&directory);
+            (
+                Cow::Owned(archived_image(directory, "burn-actor.bin", ACTOR_IMAGE)),
+                Cow::Owned(archived_image(
+                    directory,
+                    "burn-block-guest.bin",
+                    ARCHIVED_BLOCK_IMAGE_ID,
+                )),
+                ARCHIVED_BLOCK_IMAGE_ID,
+            )
+        } else {
+            assert_eq!(ACTOR_IMAGE, REDEMPTION_BURN_GUEST_ID);
+            (
+                Cow::Borrowed(REDEMPTION_BURN_GUEST_ELF),
+                Cow::Borrowed(BURN_BLOCK_GUEST_ELF),
+                BURN_BLOCK_GUEST_ID,
+            )
+        };
+    let (input, expected, leaf) = native_fixture(actor_elf, mode == "check");
     let executor_env = || {
         ExecutorEnv::builder()
             .write_slice(&lee_core::to_borsh_frame(&input))
@@ -254,7 +285,7 @@ fn main() {
         (Some("check"), []) => check_invalid(input),
         (Some("execute"), []) => {
             let result = default_executor()
-                .execute(executor_env(), BURN_BLOCK_GUEST_ELF)
+                .execute(executor_env(), &block_elf)
                 .unwrap();
             assert_eq!(
                 borsh::from_slice::<Journal>(&result.journal.bytes).unwrap(),
@@ -269,13 +300,9 @@ fn main() {
             println!("Proving Burn block {}", hex::encode(expected.block_hash));
             let started = Instant::now();
             let proof = default_prover()
-                .prove_with_opts(
-                    executor_env(),
-                    BURN_BLOCK_GUEST_ELF,
-                    &ProverOpts::composite(),
-                )
+                .prove_with_opts(executor_env(), &block_elf, &ProverOpts::composite())
                 .unwrap();
-            verify(&proof.receipt, &expected);
+            verify(&proof.receipt, &expected, block_image_id);
             let bytes = borsh::to_vec(&proof.receipt).unwrap();
             fs::write(path, &bytes).unwrap();
             println!(
@@ -287,13 +314,13 @@ fn main() {
         }
         (Some("verify"), [path]) => {
             let receipt = borsh::from_slice(&fs::read(path).unwrap()).unwrap();
-            verify(&receipt, &expected);
+            verify(&receipt, &expected, block_image_id);
             println!("PASS independently verified Burn block receipt");
         }
         (Some("native-snapshot"), [directory]) => snapshot(directory, &expected, leaf),
         (Some("fixture"), [path, directory]) => {
             let receipt: Receipt = borsh::from_slice(&fs::read(path).unwrap()).unwrap();
-            verify(&receipt, &expected);
+            verify(&receipt, &expected, block_image_id);
             let journal = borsh::from_slice(&receipt.journal.bytes).unwrap();
             snapshot(directory, &journal, leaf);
             checkpoint(directory, &journal);
